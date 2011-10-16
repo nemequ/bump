@@ -1,0 +1,15 @@
+/.deps
+/.libs
+/Makefile
+/Makefile.in
+/bump-*-internal.h
+/bump-*.deps
+/bump-*.vapi
+/bump.h
+/config.h
+/config.h.in
+/.gitignore
+/libbump*.la
+/libbump*_la_vala.stamp
+/stamp-h1
+

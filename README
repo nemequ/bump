@@ -1,0 +1,6 @@
+Bump is a small utility library providing high-level concurrency
+related objects designed for asynchronous GObject programming,
+especially from Vala.
+
+For more information on Bump, see the project page on Google Code:
+http://code.google.com/p/libbump/
