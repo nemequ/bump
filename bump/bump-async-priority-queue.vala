@@ -3,8 +3,11 @@ namespace Bump {
     private GLib.Cond cond = new GLib.Cond ();
     private GLib.Mutex mutex = new GLib.Mutex ();
 
+    public int waiting_threads { get; private set; }
+
     private G? poll_timed_internal (GLib.TimeVal? until = null) {
       this.mutex.lock ();
+      this.waiting_threads++;
 
       G? data = null;
 
@@ -20,6 +23,7 @@ namespace Bump {
         }
       }
 
+      this.waiting_threads--;
       this.mutex.unlock ();
 
       return data;
@@ -63,6 +67,7 @@ namespace Bump {
 
     private G? peek_timed_internal (GLib.TimeVal? until = null) {
       this.mutex.lock ();
+      this.waiting_threads++;
 
       G? data = null;
 
@@ -78,6 +83,7 @@ namespace Bump {
         }
       }
 
+      this.waiting_threads--;
       this.mutex.unlock ();
 
       return data;
@@ -140,7 +146,7 @@ namespace Bump {
   }
 }
 
-#if TUMBLER_TEST_APQ
+#if BUMP_TEST_ASYNC_PRIORITY_QUEUE
 private static int main (string[] args) {
   var q = new Tumbler.AsyncPriorityQueue<string> ();
   string r;
