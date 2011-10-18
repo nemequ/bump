@@ -8,6 +8,7 @@ lib_LTLIBRARIES = \
 
 libbump@BUMP_API_VERSION@_la_SOURCES = \
 	bump-async-priority-queue.vala \
+	bump-idle-queue.vala \
 	bump-mutex.vala \
 	bump-task-queue.vala \
 	bump-thread-pool.vala \
