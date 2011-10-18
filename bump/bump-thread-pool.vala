@@ -51,17 +51,21 @@ namespace Bump {
     public override void add (owned GLib.SourceFunc task, int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
       base.add (() => { return task (); }, priority, cancellable);
 
-      /* Not strictly thread-safe, but locks are expensive. Since this
-       * check comes after adding queueing the data, worst case
-       * scenario should be we create an extra thread, which I don't
-       * think is really a big deal. Not creating a thread when we
-       * should would be a problem. */
-      if ( (this.idle_count == 0) && ((this.max_threads == 0) || (this._count < this.max_threads)) ) {
-        GLib.AtomicInt.inc (ref this._count);
+      bool spawn_new_thread = false;
+      lock ( this.count ) {
+        if ( (this.idle_count == 0) && ((this.max_threads == 0) || (this._count < this.max_threads)) ) {
+          spawn_new_thread = true;
+          this._count++;
+        }
+      }
+
+      if ( spawn_new_thread ) {
         GLib.Thread.create<void*> (() => {
             while ( this.process (this.max_idle_time) ) { }
 
-            GLib.AtomicInt.dec_and_test (ref this._count);
+            lock ( this.count ) {
+              this._count--;
+            }
             return null;
           }, false);
       }
