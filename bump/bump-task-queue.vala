@@ -117,8 +117,15 @@ namespace Bump {
     /**
      * Process a single task in the queue
      *
+     * This is method should not usually be called by user code (which
+     * should usually be calling @{link execute} instead). This method
+     * will naïvely invoke the callback and remove or requeue it
+     * depending on the result, and assumes that any locks have
+     * already been acquired.
+     *
      * @param wait the maximum number of microseconds to wait for an
-     *   item to appear in the queue
+     *   item to appear in the queue (0 for no waiting, < 0 to wait
+     *   indefinitely).
      * @return true if an item was processed, false if not
      */
     public virtual bool process (GLib.TimeSpan wait = 0) {
@@ -225,7 +232,7 @@ private static int main (string[] args) {
       return null;
     }, false);
 
-  GLib.debug (q.execute<string> (() => { return "Processed in background."; }));
+  GLib.debug (q.execute<string> (() => { return "Processed in background, but blocking."; }));
 
   GLib.MainLoop loop = new GLib.MainLoop ();
 

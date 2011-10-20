@@ -1,4 +1,11 @@
 namespace Bump {
+  /**
+   * Priority queue for asynchronous communications
+   *
+   * This is basically just a layer on top of GeePriorityQueue to
+   * provide thread safety and blocking peek and poll methods, similar
+   * to how GAsyncQueue adds functionality to GQueue.
+   */
   public class AsyncPriorityQueue<G> : Gee.PriorityQueue<G> {
     private GLib.Cond cond = new GLib.Cond ();
     private GLib.Mutex mutex = new GLib.Mutex ();
