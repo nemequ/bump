@@ -118,7 +118,7 @@ namespace Bump {
      * Process a single task in the queue
      *
      * This is method should not usually be called by user code (which
-     * should usually be calling @{link execute} instead). This method
+     * should usually be calling {@link execute} instead). This method
      * will naïvely invoke the callback and remove or requeue it
      * depending on the result, and assumes that any locks have
      * already been acquired.

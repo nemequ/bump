@@ -89,8 +89,8 @@ namespace Bump {
      * Executes the callback but does not unlock the mutex upon
      * completion
      *
-     * This is necessary for the @{link lock} and @{link unlock}
-     * methods, but we don't want to make @{link add} do this since it
+     * This is necessary for the {@link lock} and {@link unlock}
+     * methods, but we don't want to make {@link add} do this since it
      * is public.
      */
     private void add_without_unlock (owned GLib.SourceFunc task, int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {

@@ -8,12 +8,12 @@ namespace Bump {
    */
   public class Claim : GLib.Object {    
     /**
-     * The @{link Bump.Mutex} which this claim operates on
+     * The {@link Bump.Mutex} which this claim operates on
      */
     public Mutex mutex { get; construct; }
 
     /**
-     * Whether the claim is active (i.e., locking the @{link mutex})
+     * Whether the claim is active (i.e., locking the {@link mutex})
      */
     public bool active {
       get {
