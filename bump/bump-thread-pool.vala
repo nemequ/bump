@@ -84,7 +84,7 @@ namespace Bump {
      *
      * Setting the max_threads property can clobber the value, so you
      * should prefer to use this method if you want to increase the
-     * number of threads since.
+     * number of threads.
      */
     public void increase_max_threads (int new_max_threads) {
       lock ( this.max_threads ) {

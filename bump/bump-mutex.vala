@@ -240,6 +240,30 @@ namespace Bump {
       }
     }
 
+    /**
+     * Claim the lock
+     *
+     * @param priority the priority
+     * @param cancellable optional cancellable
+     */
+    public Claim claim (int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
+      Claim claim = new Claim (this);
+      claim.init (cancellable);
+      return claim;
+    }
+
+    /**
+     * Claim the lock asynchronously
+     *
+     * @param priority the priority
+     * @param cancellable optional cancellable
+     */
+    public async Claim claim_async (int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
+      Claim claim = new Claim (this);
+      yield claim.init_async (priority, cancellable);
+      return claim;
+    }
+
     construct {
       this.queue = this.get_queue ();
     }
