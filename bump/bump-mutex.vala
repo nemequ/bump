@@ -6,7 +6,8 @@ namespace Bump {
    * integrates well with the main event loop and provides features
    * such as prioritization, cancellation, and asynchronous
    * interfaces. Requests with higher priorities will always be
-   * executed first.
+   * executed first, and requests of equal priorities will be executed
+   * in the order in which they are requested.
    *
    * Unfortunately, this is relatively slow compared to lower level
    * mutex implementations such as GMutex and pthreads. If you don't
@@ -16,6 +17,12 @@ namespace Bump {
    * convenience provided by these methods can go a long way towards
    * helping you write applications don't block the main loop and,
    * therefore, feel faster.
+   *
+   * Executing a task (including acquiring the lock) asynchronously
+   * will result in the task being run in a background thread. If you
+   * wish to execute asynchronous tasks in an idle callback, you
+   * currently must add the idle callback and block until it
+   * completes.
    *
    * Please keep in mind that callbacks are run atomically; cancelling
    * a request will not stop a callback which is already being run.
@@ -188,7 +195,7 @@ namespace Bump {
      * @param func the callback
      * @return the return value of the callback, or null if it would have blocked
      */
-    public G? try_execute<G> (GLib.ThreadFunc<G> func) throws GLib.Error {
+    public G? try_execute<G> (Callback<G> func) throws GLib.Error {
       if ( this.try_lock () ) {
         try {
           return func ();
@@ -222,7 +229,7 @@ namespace Bump {
       }
     }
 
-    public override G execute<G> (GLib.ThreadFunc<G> func, int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
+    public override G execute<G> (Callback<G> func, int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
       this.lock (priority, cancellable);
       try {
         return func ();
@@ -231,7 +238,7 @@ namespace Bump {
       }
     }
 
-    public override async G execute_async<G> (GLib.ThreadFunc<G> func, int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
+    public override async G execute_async<G> (Callback<G> func, int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
       yield this.lock_async (priority, cancellable);
       try {
         return func ();

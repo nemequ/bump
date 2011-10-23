@@ -1,5 +1,14 @@
 namespace Bump {
   /**
+   * Callback which is invoked by the {@link TaskQueue.execute} and
+   * {@link TaskQueue.execute_async} functions.
+   *
+   * This is similar to GThreadFunc, except the delegate can throw
+   * exceptions.
+   */
+  public delegate G Callback<G> () throws GLib.Error;
+
+  /**
    * Base class used for common task queueing behavior
    */
   public class TaskQueue : GLib.Object {
@@ -147,10 +156,15 @@ namespace Bump {
 
     private class ThreadCallbackData<G> {
       public G? return_value;
-      public GLib.ThreadFunc<G> thread_func;
+      public Callback<G> thread_func;
+      public GLib.Error error;
 
       public bool source_func () {
-        this.return_value = thread_func ();
+        try {
+          this.return_value = thread_func ();
+        } catch ( GLib.Error e ) {
+          this.error = e;
+        }
 
         return false;
       }
@@ -164,7 +178,7 @@ namespace Bump {
      * @param cancellable optional cancellable for aborting the
      *   operation
      */
-    public virtual G execute<G> (GLib.ThreadFunc<G> func, int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
+    public virtual G execute<G> (Callback<G> func, int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
       GLib.Mutex mutex = new GLib.Mutex ();
       ThreadCallbackData<G> data = new ThreadCallbackData<G> ();
 
@@ -180,6 +194,10 @@ namespace Bump {
       this.add (data.source_func, priority, cancellable);
       mutex.lock ();
 
+      if ( data.error != null ) {
+        throw data.error;
+      }
+
       return data.return_value;
     }
 
@@ -191,7 +209,7 @@ namespace Bump {
      * @param cancellable optional cancellable for aborting the
      *   operation
      */
-    public virtual async G execute_async<G> (GLib.ThreadFunc<G> func, int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
+    public virtual async G execute_async<G> (Callback<G> func, int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
       ThreadCallbackData<G> data = new ThreadCallbackData<G> ();
 
       data.thread_func = () => {
@@ -203,6 +221,10 @@ namespace Bump {
       };
       this.add (data.source_func, priority, cancellable);
       yield;
+
+      if ( data.error != null ) {
+        throw data.error;
+      }
 
       return data.return_value;
     }
@@ -232,7 +254,14 @@ private static int main (string[] args) {
       return null;
     }, false);
 
-  GLib.debug (q.execute<string> (() => { return "Processed in background, but blocking."; }));
+  try {
+    GLib.critical ("Failed to catch an error: %s", q.execute<string> (() => {
+          throw new GLib.IOError.FAILED ("Error thrown from callback");
+          return "Should not be reached.";
+        }));
+  } catch ( GLib.Error e ) {
+    GLib.debug ("Caught an error (as expected): %s", e.message);
+  }
 
   GLib.MainLoop loop = new GLib.MainLoop ();
 
