@@ -46,9 +46,7 @@ namespace Bump {
        * @return whether to requeue the data
        */
       public bool trigger (A arg) {
-        GLib.debug ("Invoking callback (0x%lx)...", (ulong) this.task);
         var r = this.task (arg);
-        GLib.debug ("Callback invoked");
         return r;
       }
     }
@@ -220,8 +218,8 @@ namespace Bump {
       Bump.Event.Data<T> data = this.prepare (priority, cancellable);
       data.task = (arg) => {
         this.pool.add (() => {
-            GLib.error ("https://bugzilla.gnome.org/show_bug.cgi?id=663210");
-            //retval = func (arg);
+            retval = func (arg);
+            GLib.Idle.add (this.execute_background.callback);
 
             return false;
           }, priority, cancellable);
@@ -232,7 +230,6 @@ namespace Bump {
 
       return retval;
     }
-
 
     construct {
       if ( this.pool == null ) {
@@ -290,7 +287,7 @@ private static int main (string[] args) {
       GLib.debug ("From execute: %s", res);
       return null;
     }, false);
-  //test_execute_background.begin (evt, loop);
+  test_execute_background.begin (evt, loop);
   test_execute_async.begin (evt, loop);
 
 
