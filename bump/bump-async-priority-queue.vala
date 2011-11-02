@@ -140,14 +140,13 @@ namespace Bump {
       return r;
     }
 
-    public override bool remove (G element) {
+    public override void foreach (Gee.ForallFunc<G> f) {
       this.mutex.lock ();
-      bool r = base.remove (element);
+      base.foreach ((d) => { f (d); });
       this.mutex.unlock ();
-      return r;
     }
 
-    public AsyncPriorityQueue (owned GLib.CompareFunc? compare_func = null) {
+    public AsyncPriorityQueue (owned GLib.CompareDataFunc? compare_func = null) {
       base (compare_func);
     }
   }

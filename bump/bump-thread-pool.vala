@@ -110,9 +110,10 @@ namespace Bump {
      * returned pool will be 0. Otherwise, the it will be whichever
      * value is greater.
      *
-     * @param max_threads the minimum max_threads value of the thread pool
+     * @param max_threads the minimum max_threads value of the thread
+     *   pool, or -1 to leave the current value
      */
-    public ThreadPool get_global (int max_threads) {
+    public static ThreadPool get_global (int max_threads = -1) {
       ThreadPool? gp = global_pool;
 
       if ( gp == null ) {
@@ -126,7 +127,8 @@ namespace Bump {
         }
       }
 
-      gp.increase_max_threads (max_threads);
+      if ( max_threads >= 0 )
+        gp.increase_max_threads (max_threads);
 
       return gp;
     }

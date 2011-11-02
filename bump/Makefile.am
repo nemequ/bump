@@ -8,7 +8,9 @@ lib_LTLIBRARIES = \
 
 libbump@BUMP_API_VERSION@_la_SOURCES = \
 	bump-async-priority-queue.vala \
+	bump-callback-queue.vala \
 	bump-claim.vala \
+	bump-event.vala \
 	bump-idle-queue.vala \
 	bump-mutex.vala \
 	bump-task-queue.vala \
@@ -36,7 +38,7 @@ libbump@BUMP_API_VERSION@_la_PKG_DEPENDS = \
 	gio-2.0 \
 	gobject-2.0 \
 	glib-2.0 \
-	gee-1.0 \
+	$(GEE_PACKAGE) \
 	$(NULL)
 
 bump-@BUMP_API_VERSION@.deps:
