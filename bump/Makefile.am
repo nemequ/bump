@@ -48,6 +48,17 @@ bump-@BUMP_API_VERSION@.deps:
 
 libbump@BUMP_API_VERSION@_la_VALAPKGFLAGS = $(foreach pkg_config_name,$(libbump@BUMP_API_VERSION@_la_PKG_DEPENDS),--pkg $(pkg_config_name))
 
+if ENABLE_VALADOC
+devhelp: $(libbump@BUMP_API_VERSION@_la_SOURCES)
+	$(AM_V_GEN) $(VALADOC) --force -o $@/ \
+	  --package-name=bump \
+	  --package-version=@BUMP_API_VERSION@ \
+	  --doclet $@ \
+	  --driver 0.13.x \
+	  $(libbump@BUMP_API_VERSION@_la_VALAPKGFLAGS) \
+	  $(libbump@BUMP_API_VERSION@_la_SOURCES)
+endif
+
 libbump@BUMP_API_VERSION@_la_VALAFLAGS = \
 	$(GIR_BUMP_VALAFLAGS) \
 	--library bump-@BUMP_API_VERSION@ \
@@ -123,7 +134,6 @@ endif # HAVE_INTROSPECTION
 
 MAINTAINERCLEANFILES = \
 	bump.h \
-	Bump-@BUMP_API_VERSION@.gir \
 	bump-@BUMP_API_VERSION@.vapi \
 	$(NULL)
 
@@ -131,7 +141,21 @@ BUILT_SOURCES = .gitignore
 
 EXTRA_DIST = \
 	bump.h \
-	Bump-@BUMP_API_VERSION@.gir \
 	bump-@BUMP_API_VERSION@.vapi \
 	bump-@BUMP_API_VERSION@.deps \
 	$(NULL)
+
+if ENABLE_VALADOC
+EXTRA_DIST += devhelp
+
+install-data-hook: devhelp
+	$(MKDIR_P) $(DESTDIR)$(datadir)/devhelp/books/Bump/img
+	$(INSTALL_DATA) -t $(DESTDIR)$(datadir)/devhelp/books/Bump devhelp/bump/*.*
+	$(INSTALL_DATA) -t $(DESTDIR)$(datadir)/devhelp/books/Bump/img devhelp/bump/img/*
+
+uninstall-hook:
+	rm -rf $(DESTDIR)$(datadir)/devhelp/books/Bump
+
+maintainer-clean-local:
+	-rm -rf devhelp
+endif

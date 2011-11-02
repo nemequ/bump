@@ -8,10 +8,9 @@
 /bump.h
 /config.h
 /config.h.in
+/devhelp
 /.gitignore
 /.gitignore.in
 /libbump@BUMP_API_VERSION@.la
 /libbump@BUMP_API_VERSION@_la_vala.stamp
 /stamp-h1
-
-# Automatically generated from Makefile
