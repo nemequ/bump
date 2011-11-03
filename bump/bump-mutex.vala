@@ -51,7 +51,7 @@ namespace Bump {
      */
     private GLib.Mutex inner_lock = new GLib.Mutex ();
 
-    private unowned AsyncPriorityQueue<TaskQueue.Data> queue;
+    private unowned Bump.CallbackQueue<TaskQueue.Data> queue;
 
     private void* process_cb () {
       GLib.TimeSpan max_idle_time = this.max_idle_time;
@@ -65,7 +65,7 @@ namespace Bump {
          * request. */
         if ( this.queue.peek_timed (max_idle_time) != null ) {
           this.inner_lock.lock ();
-          if ( (data = this.queue.try_poll ()) == null ) {
+          if ( (data = this.queue.poll_timed (0)) == null ) {
             /* Should only happen if the request is cancelled
              * between the peek and poll, and there are no other
              * pending requests */
@@ -74,7 +74,7 @@ namespace Bump {
           }
 
           if ( data.trigger () ) {
-            this.add_internal (data);
+            this.queue.offer (data);
           }
 
           data = null;

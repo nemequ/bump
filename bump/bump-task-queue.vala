@@ -12,32 +12,8 @@ namespace Bump {
    * Base class used for common task queueing behavior
    */
   public class TaskQueue : GLib.Object {
-    internal class Data {
-      public TaskQueue? owner;
-      public int priority;
-      public int age;
+    internal class Data : CallbackQueue.Data {
       public GLib.SourceFunc? task;
-      public GLib.Cancellable? cancellable;
-      public ulong cancellable_id;
-
-      public void connect_cancellable () {
-        if ( this.cancellable != null ) {
-          if ( this.cancellable_id != 0 ) {
-            this.disconnect_cancellable ();
-          }
-
-          this.cancellable_id = this.cancellable.connect ((c) => {
-              this.owner.remove (this);
-            });
-        }
-      }
-
-      public void disconnect_cancellable () {
-        if ( this.cancellable != null && this.cancellable_id != 0 ) {
-          this.cancellable.disconnect (this.cancellable_id);
-          this.cancellable_id = 0;
-        }
-      }
 
       /**
        * Trigger the callback
@@ -46,11 +22,6 @@ namespace Bump {
        */
       public bool trigger () {
         return this.task ();
-      }
-
-      public static int compare (TaskQueue.Data? a, TaskQueue.Data? b) {
-        int res = a.priority - b.priority;
-        return (res != 0) ? res : a.age - b.age;
       }
     }
 
@@ -72,9 +43,10 @@ namespace Bump {
     /**
      * Requests which need processing
      */
-    private AsyncPriorityQueue<TaskQueue.Data> queue = new AsyncPriorityQueue<TaskQueue.Data> (TaskQueue.Data.compare);
+    private Bump.CallbackQueue<Bump.TaskQueue.Data> queue =
+      new Bump.CallbackQueue<Bump.TaskQueue.Data> ();
 
-    internal unowned AsyncPriorityQueue<TaskQueue.Data> get_queue () {
+    internal unowned Bump.CallbackQueue<TaskQueue.Data> get_queue () {
       return this.queue;
     }
 
@@ -86,7 +58,7 @@ namespace Bump {
      */
     public int length {
       get {
-        return this.queue.size;
+        return this.queue.length;
       }
     }
 
@@ -96,15 +68,17 @@ namespace Bump {
     }
 
     /**
-     * Add (or re-add) to queue
+     * Create a new data structure
+     *
+     * @param priority the priority of the callback
+     * @param cancellable optional cancellable
      */
-    internal void add_internal (TaskQueue.Data data) {
-      if ( data.cancellable == null || !data.cancellable.is_cancelled () ) {
-        data.age = this.increment_age ();
-        this.queue.offer (data);
-        if ( data.cancellable_id == 0 )
-          data.connect_cancellable ();
-      }
+    private Bump.TaskQueue.Data prepare (int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
+      Bump.TaskQueue.Data data = new Bump.TaskQueue.Data ();
+      data.priority = priority;
+      data.cancellable = cancellable;
+
+      return data;
     }
 
     /**
@@ -115,12 +89,9 @@ namespace Bump {
      * @param cancellable optional cancellable for aborting the task
      */
     public virtual void add (owned GLib.SourceFunc task, int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
-      TaskQueue.Data data = new TaskQueue.Data ();
-      data.owner = this;
-      data.priority = priority;
+      TaskQueue.Data data = this.prepare (priority, cancellable);new TaskQueue.Data ();
       data.task = () => { return task (); };
-      data.cancellable = cancellable;
-      this.add_internal (data);
+      this.queue.offer (data);
     }
 
     /**

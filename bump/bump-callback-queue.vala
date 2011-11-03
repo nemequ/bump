@@ -43,6 +43,12 @@ namespace Bump {
       }
     }
 
+    public int waiting_threads {
+      get {
+        return this.queue.waiting_threads;
+      }
+    }
+
     /**
      * The actual queue
      */

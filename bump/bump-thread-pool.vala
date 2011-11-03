@@ -28,7 +28,7 @@ namespace Bump {
 
     private int _count = 0;
 
-    private unowned AsyncPriorityQueue<TaskQueue.Data> queue;
+    private unowned Bump.CallbackQueue<TaskQueue.Data> queue;
 
     /**
      * Number of threads currently in the pool
