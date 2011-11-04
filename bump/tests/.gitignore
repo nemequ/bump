@@ -1,0 +1,8 @@
+/.deps
+/.libs
+/Makefile
+/Makefile.in
+/event-test
+/event-test.c
+/event-test.o
+/event_test_vala.stamp

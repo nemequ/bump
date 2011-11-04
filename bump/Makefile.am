@@ -1,3 +1,5 @@
+include $(top_srcdir)/Makefile.decl
+
 NULL = 
 
 CLEANFILES =
@@ -139,7 +141,7 @@ MAINTAINERCLEANFILES = \
 
 BUILT_SOURCES = .gitignore
 
-EXTRA_DIST = \
+EXTRA_DIST += \
 	bump.h \
 	bump-@BUMP_API_VERSION@.vapi \
 	bump-@BUMP_API_VERSION@.deps \

@@ -88,7 +88,8 @@ AC_CHECK_HEADERS([stdlib.h string.h])
 # Checks for library functions.
 
 AC_CONFIG_FILES([Makefile
+                 bump.pc
                  bump/.gitignore.in
                  bump/Makefile
-                 bump.pc])
+                 bump/tests/Makefile])
 AC_OUTPUT
