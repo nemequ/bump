@@ -36,3 +36,17 @@ resource_pool_test_SOURCES = resource-pool-test.vala
 
 TEST_PROGS += claim-test
 claim_test_SOURCES = claim-test.vala
+
+GITIGNORE = \
+	$(TEST_PROGS) \
+	$(foreach prog,$(TEST_PROGS),$(subst /,_,$(subst -,_,$(subst .,_,$(prog))))_vala.stamp) \
+	$(foreach srcs,$(foreach prog,$(TEST_PROGS),$(subst /,_,$(subst -,_,$(subst .,_,$(prog))))_SOURCES),$($(srcs):.vala=.c) $($(srcs):.vala=.o))
+
+.gitignore: .gitignore.in
+	$(AM_V_GEN) echo "# Automatically generated from $^. Do not edit." > $@ && \
+	cat < $^ >> $@ && \
+	for ignoredfile in $(GITIGNORE); do \
+	  echo /$$ignoredfile >> $@; \
+	done;
+
+BUILT_SOURCES = .gitignore

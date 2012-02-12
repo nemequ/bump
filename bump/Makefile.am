@@ -2,6 +2,8 @@ include $(top_srcdir)/Makefile.decl
 
 NULL = 
 
+SUBDIRS = tests
+
 CLEANFILES =
 
 lib_LTLIBRARIES = \
@@ -20,10 +22,6 @@ libbump@BUMP_API_VERSION@_la_SOURCES = \
 	bump-semaphore-claim.vala \
 	bump-task-queue.vala \
 	bump-threading.vala \
-	$(NULL)
-
-temporarily_disabled =
-	bump-worker.vala \
 	$(NULL)
 
 if HAVE_INTROSPECTION
