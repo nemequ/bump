@@ -5,12 +5,16 @@ namespace Bump {
    * This basically just provides common code to TaskQueue and Event.
    */
   internal class CallbackQueue<G> : GLib.Object {
-    public class Data {
+    internal abstract class Data {
       public unowned Bump.CallbackQueue<Bump.CallbackQueue.Data>? owner;
       public int priority;
       public int age;
       public GLib.Cancellable? cancellable;
       public ulong cancellable_id;
+
+      public void queue () {
+        this.owner.requeue (this);
+      }
 
       public void connect_cancellable () {
         if ( this.cancellable != null ) {
@@ -52,8 +56,7 @@ namespace Bump {
     /**
      * The actual queue
      */
-    private Bump.AsyncPriorityQueue<CallbackQueue.Data> queue =
-      new Bump.AsyncPriorityQueue<CallbackQueue.Data> (CallbackQueue.Data.compare);
+    private Bump.AsyncPriorityQueue<CallbackQueue.Data> queue;
 
     /**
      * Number of items that have been added to the queue
@@ -94,6 +97,19 @@ namespace Bump {
       return this.queue.remove ((CallbackQueue.Data) element);
     }
 
+    public signal void consumer_shortage ();
+
+    /**
+     * Add the item to the queue
+     *
+     * This will assume that the data is properly configured (the
+     * cancellable is connected, ower is set, etc.).
+     */
+    internal void requeue (Bump.CallbackQueue.Data data) {
+      data.age = this.increment_age ();
+      this.queue.offer (data);
+    }
+
     /**
      * Add (or re-add) to queue
      */
@@ -103,11 +119,15 @@ namespace Bump {
         if ( d.owner != this ) {
           d.owner = (Bump.CallbackQueue<Bump.CallbackQueue.Data>) this;
         }
-        d.age = this.increment_age ();
-        this.queue.offer (d);
+        this.requeue (d);
         if ( d.cancellable_id == 0 )
           d.connect_cancellable ();
       }
+    }
+
+    construct {
+      this.queue = new Bump.AsyncPriorityQueue<CallbackQueue.Data> (CallbackQueue.Data.compare);
+      this.queue.consumer_shortage.connect (() => { this.consumer_shortage (); });
     }
   }
 }

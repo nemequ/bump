@@ -7,26 +7,34 @@ namespace Bump {
    * to how GAsyncQueue adds functionality to GQueue.
    */
   public class AsyncPriorityQueue<G> : Gee.PriorityQueue<G> {
-    private GLib.Cond cond = new GLib.Cond ();
-    private GLib.Mutex mutex = new GLib.Mutex ();
+    private GLib.Cond cond = GLib.Cond ();
+    private GLib.Mutex mutex = GLib.Mutex ();
 
     public int waiting_threads { get; private set; }
 
-    private G? poll_timed_internal (GLib.TimeVal? until = null) {
+    /**
+     * Poll the queue, blocking until timeout or data is received
+     *
+     * @param wait the duration to wait. 0 for no waiting, -1 to wait
+     *   forever
+     * @return the data, or null if there was no data
+     */
+    public G? poll_timed (GLib.TimeSpan wait = -1) {
+      int64 until = (wait > 0) ? GLib.get_monotonic_time () + wait : wait;
+      G? data = null;
+
       this.mutex.lock ();
       this.waiting_threads++;
 
-      G? data = null;
-
-      if ( (data = base.poll ()) == null ) {
-        while ( (data = base.poll ()) == null ) {
-          if ( until == null ) {
-            this.cond.wait (this.mutex);
-          } else {
-            if ( !this.cond.timed_wait (this.mutex, until) ) {
-              break;
-            }
+      while ( (data = base.poll ()) == null ) {
+        if ( until < 0 ) {
+          this.cond.wait (this.mutex);
+        } else if ( until > 0 ) {
+          if ( !this.cond.wait_until (this.mutex, until) ) {
+            break;
           }
+        } else {
+          break;
         }
       }
 
@@ -34,59 +42,34 @@ namespace Bump {
       this.mutex.unlock ();
 
       return data;
-    }
-
-    /**
-     * Poll the queue, giving up after the specified time span
-     *
-     * @param wait number of microseconds to wait
-     * @return the data, or null if the time was exceeded
-     */
-    public virtual G? poll_timed (GLib.TimeSpan wait = -1) {
-      if ( wait > 0 ) {
-        GLib.TimeVal tv = GLib.TimeVal ();
-        tv.get_current_time ();
-        tv.add ((long) wait);
-        return this.poll_timed_internal (tv);
-      } else if ( wait < 0 ) {
-        return this.poll_timed_internal (null);
-      } else {
-        return this.try_poll ();
-      }
     }
 
     public override G? poll () {
-      return this.poll_timed_internal (null);
+      return this.poll_timed (-1);
     }
-
     /**
-     * Poll the queue without blocking
+     * Peek on the queue, blocking until timeout or data is received
      *
+     * @param wait the duration to wait. 0 for no waiting, -1 to wait
+     *   forever
      * @return the data, or null if there was no data
      */
-    public virtual G? try_poll () {
+    public G? peek_timed (GLib.TimeSpan wait = -1) {
+      int64 until = (wait > 0) ? GLib.get_monotonic_time () + wait : wait;
       G? data = null;
-      this.mutex.lock ();
-      data = base.poll ();
-      this.mutex.unlock ();
-      return data;
-    }
 
-    private G? peek_timed_internal (GLib.TimeVal? until = null) {
       this.mutex.lock ();
       this.waiting_threads++;
 
-      G? data = null;
-
-      if ( (data = base.peek ()) == null ) {
-        while ( (data = base.peek ()) == null ) {
-          if ( until == null ) {
-            this.cond.wait (this.mutex);
-          } else {
-            if ( !this.cond.timed_wait (this.mutex, until) ) {
-              break;
-            }
+      while ( (data = base.peek ()) == null ) {
+        if ( until < 0 ) {
+          this.cond.wait (this.mutex);
+        } else if ( until > 0 ) {
+          if ( !this.cond.wait_until (this.mutex, until) ) {
+            break;
           }
+        } else {
+          break;
         }
       }
 
@@ -96,47 +79,23 @@ namespace Bump {
       return data;
     }
 
-    /**
-     * Peek the queue, giving up after the specified time span
-     *
-     * @param wait number of microseconds to wait
-     * @return the data, or null if the time was exceeded
-     */
-    public virtual G? peek_timed (GLib.TimeSpan wait = -1) {
-      if ( wait > 0 ) {
-        GLib.TimeVal tv = GLib.TimeVal ();
-        tv.get_current_time ();
-        tv.add ((long) wait);
-        return this.peek_timed_internal (tv);
-      } else if ( wait < 0 ) {
-        return this.peek ();
-      } else {
-        return this.try_peek ();
-      }
-    }
-
     public override G? peek () {
-      return this.peek_timed_internal (null);
-    }
-
-    /**
-     * Peek the queue without blocking
-     *
-     * @return the data, or null if there was no data
-     */
-    public virtual G? try_peek () {
-      G? data = null;
-      this.mutex.lock ();
-      data = base.peek ();
-      this.mutex.unlock ();
-      return data;
+      return this.peek_timed (-1);
     }
 
     public override bool offer (G element) {
+      bool emit_shortage = false;
+
       this.mutex.lock ();
       bool r = base.offer (element);
-      this.cond.signal ();
+      if ( this.waiting_threads == 0 )
+        emit_shortage = true;
+      else
+        this.cond.signal ();
       this.mutex.unlock ();
+
+      this.consumer_shortage ();
+
       return r;
     }
 
@@ -146,8 +105,13 @@ namespace Bump {
       this.mutex.unlock ();
     }
 
+    /**
+     * Data was added to the queue but no consumers were waiting.
+     */
+    public signal void consumer_shortage ();
+
     public AsyncPriorityQueue (owned GLib.CompareDataFunc? compare_func = null) {
-      base (compare_func);
+      base ((owned) compare_func);
     }
   }
 }

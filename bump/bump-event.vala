@@ -8,7 +8,7 @@ namespace Bump {
    * callback tasks will be added to the idle queue, and all blocking
    * tasks will be woken.
    *
-   * An interesting side-effect of this is that Event.SourceFunc
+   * An interesting side-effect of this is that {@link Event.SourceFunc}
    * callbacks can be executed after they return false, since other
    * events may have caused the callback to be queued again. If you
    * want to make sure that a callback is not invoked again you should
@@ -18,7 +18,7 @@ namespace Bump {
     /**
      * Callback for use with {@link Event.execute} and variants
      *
-     * @param argument passed when triggering the event
+     * @param arg argument passed when triggering the event
      * @return whatever you want
      */
     public delegate R Callback<A,R> (A arg) throws GLib.Error;
@@ -29,7 +29,7 @@ namespace Bump {
      * The callback will be dispatched for each event, until it
      * returns false
      *
-     * @param argument passed when triggering the event
+     * @param arg argument passed when triggering the event
      * @return whatever you want
      */
     public delegate bool SourceFunc<A> (A arg);
@@ -57,7 +57,7 @@ namespace Bump {
     /**
      * The pool used to execute background tasks
      */
-    public Bump.ThreadPool pool { get; construct; }
+    public Bump.TaskQueue pool { get; construct; }
 
     /**
      * Whether to automatically reset the event after dispatching the
@@ -121,7 +121,7 @@ namespace Bump {
      *
      * @param func the callback to add
      * @param priority the priority of the callback
-     * @param optional cancellable for removing the callback
+     * @param cancellable optional cancellable for removing the callback
      */
     public void add (owned Bump.Event.SourceFunc<T> func, int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
       Bump.Event.Data<T> data = this.prepare (priority, cancellable);
@@ -151,7 +151,7 @@ namespace Bump {
      */
     public R execute<R> (Bump.Event.Callback<T,R> func, int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
       T argument = null;
-      GLib.Mutex sync = new GLib.Mutex ();
+      GLib.Mutex sync = GLib.Mutex ();
       sync.lock ();
 
       if ( cancellable != null ) {
@@ -215,11 +215,16 @@ namespace Bump {
      */
     public async R execute_background<R> (Bump.Event.Callback<T,R> func, int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
       R retval = null;
+      GLib.Error? err = null;
       Bump.Event.Data<T> data = this.prepare (priority, cancellable);
       data.task = (arg) => {
         this.pool.add (() => {
-            retval = func (arg);
-            GLib.Idle.add (this.execute_background.callback);
+            try {
+              retval = func (arg);
+              GLib.Idle.add (this.execute_background.callback);
+            } catch ( GLib.Error e ) {
+              err = e;
+            }
 
             return false;
           }, priority, cancellable);
@@ -228,12 +233,15 @@ namespace Bump {
       this.queue.offer (data);
       yield;
 
+      if ( err != null )
+        throw err;
+
       return retval;
     }
 
     construct {
       if ( this.pool == null ) {
-        this.pool = Bump.ThreadPool.get_global (0);
+        this.pool = Bump.TaskQueue.get_global ();
       }
     }
 
@@ -245,9 +253,8 @@ namespace Bump {
      * @param pool the pool to use to execute background tasks, or
      *   null for the default
      */
-    public Event (bool auto_reset = true, Bump.ThreadPool? pool = null) {
-      GLib.Object (auto_reset: auto_reset, pool: pool);
+    public Event (bool auto_reset = true) {
+      GLib.Object (auto_reset: auto_reset);
     }
   }
 }
-

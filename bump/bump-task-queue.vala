@@ -11,40 +11,24 @@ namespace Bump {
   /**
    * Base class used for common task queueing behavior
    */
-  public class TaskQueue : GLib.Object {
+  public class TaskQueue : GLib.Object, Bump.Queue, Bump.Threading {
     internal class Data : CallbackQueue.Data {
       public GLib.SourceFunc? task;
 
       /**
        * Trigger the callback
        *
-       * @return whether to requeue the data
+       * @return whether to re-queue the data
        */
-      public bool trigger () {
+      public bool process () {
         return this.task ();
       }
     }
 
     /**
-     * Number of items that have been added to the queue
-     *
-     * This is used to make sure operations with the same priority are
-     * executed in the order received
-     */
-    private int _age = 0;
-
-    /**
-     * Atomically increment the age, returning the old value
-     */
-    private int increment_age () {
-      return GLib.AtomicInt.exchange_and_add (ref this._age, 1);
-    }
-
-    /**
      * Requests which need processing
      */
-    private Bump.CallbackQueue<Bump.TaskQueue.Data> queue =
-      new Bump.CallbackQueue<Bump.TaskQueue.Data> ();
+    private Bump.CallbackQueue<Bump.TaskQueue.Data> queue;
 
     internal unowned Bump.CallbackQueue<TaskQueue.Data> get_queue () {
       return this.queue;
@@ -82,6 +66,22 @@ namespace Bump {
     }
 
     /**
+     * Spawn new threads if appropriate
+     *
+     * @return whether or not a new thread was created
+     */
+    protected virtual int spawn (int max = -1) {
+      if ( max == 0 )
+        return 0;
+      else if ( max == -1 )
+        max = this.length;
+      else
+        max = int.min (this.length, max);
+
+      return this.spawn_internal (max);
+    }
+
+    /**
      * Add a task to the queue
      *
      * @param task the task
@@ -89,39 +89,20 @@ namespace Bump {
      * @param cancellable optional cancellable for aborting the task
      */
     public virtual void add (owned GLib.SourceFunc task, int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
-      TaskQueue.Data data = this.prepare (priority, cancellable);new TaskQueue.Data ();
-      data.task = () => { return task (); };
+      TaskQueue.Data data = this.prepare (priority, cancellable);
+      data.task = (owned) task;
       this.queue.offer (data);
+      this.spawn (-1);
     }
 
-    /**
-     * Process a single task in the queue
-     *
-     * This is method should not usually be called by user code (which
-     * should usually be calling {@link execute} instead). This method
-     * will naïvely invoke the callback and remove or requeue it
-     * depending on the result, and assumes that any locks have
-     * already been acquired.
-     *
-     * @param wait the maximum number of microseconds to wait for an
-     *   item to appear in the queue (0 for no waiting, < 0 to wait
-     *   indefinitely).
-     * @return true if an item was processed, false if not
-     */
     public virtual bool process (GLib.TimeSpan wait = 0) {
       TaskQueue.Data? data = this.queue.poll_timed (wait);
 
-      if ( data != null ) {
-        if ( data.trigger () ) {
-          data.age = this.increment_age ();
-          this.queue.offer (data);
-        } else {
-          data.owner = null;
-        }
-
-        return true;
-      } else {
+      if ( data == null )
         return false;
+      else {
+        this.run_task (data.process);
+        return true;
       }
     }
 
@@ -139,10 +120,17 @@ namespace Bump {
 
         return false;
       }
-    } 
+    }
 
     /**
      * Execute a callback, blocking until it is done
+     *
+     * The callback will be executed in the calling thread. Note that
+     * the calling thread will block until the callback can be
+     * processed, so if this method is called from the default thread
+     * it will block the main loop and likely lead to a deadlock. When
+     * executing a callback from the default thread you should use
+     * {@link execute_async} or {@link execute_background}.
      *
      * @param func the callback to execute
      * @param priority the priority
@@ -150,115 +138,113 @@ namespace Bump {
      *   operation
      */
     public virtual G execute<G> (Callback<G> func, int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
-      GLib.Mutex mutex = new GLib.Mutex ();
+      GLib.Mutex mutex = GLib.Mutex ();
       ThreadCallbackData<G> data = new ThreadCallbackData<G> ();
 
-      data.thread_func = () => {
-        try {
-          return func ();
-        } finally {
+      mutex.lock ();
+      this.add (() => {
           mutex.unlock ();
-        }
-      };
-
-      mutex.lock ();
-      this.add (data.source_func, priority, cancellable);
+          return false;
+        }, priority, cancellable);
       mutex.lock ();
 
-      if ( data.error != null ) {
-        throw data.error;
-      }
-
-      return data.return_value;
+      return func ();
     }
 
     /**
-     * Execute a callback asynchronously
+     * Execute a callback asynchronously in an idle callback
+     *
+     * The priority argument for this can be a bit misleading when
+     * mixed with {@link execute} and {@link execute_background}. When
+     * a callback is queued with this method it will be sent to the
+     * main loop in order based on priority and the time it was added,
+     * but when the callback is actually executed will then be
+     * controlled by the GLib Main Loop. It will, however, be executed
+     * in the proper order relative to any other callbacks which have
+     * already been sent to the main loop.
      *
      * @param func the callback to execute
      * @param priority the priority
      * @param cancellable optional cancellable for aborting the
      *   operation
      */
-    public virtual async G execute_async<G> (Callback<G> func, int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
-      ThreadCallbackData<G> data = new ThreadCallbackData<G> ();
+    public virtual async G execute_async<G> (owned Callback<G> func, int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
+      unowned GLib.MainContext? thread_context = GLib.MainContext.get_thread_default ();
+      GLib.IdleSource idle_source = new GLib.IdleSource ();
+      idle_source.set_callback (execute_async.callback);
 
+      this.add (() => {
+          idle_source.attach (thread_context);
+
+          return false;
+        }, priority, cancellable);
+      yield;
+
+      return func ();
+    }
+
+    /**
+     * Execute a callback in a background thread
+     *
+     * Although the supplied callback will be executed in a background
+     * thread, the async function call will be finished in an idle
+     * callback for the thread-default main context.
+     *
+     * @param func the callback to execute
+     * @param priority the priority
+     * @param cancellable optional cancellable for aborting the
+     *   operation
+     */
+    public virtual async G execute_background<G> (owned Callback<G> func, int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
+      unowned GLib.MainContext? thread_context = GLib.MainContext.get_thread_default ();
+      GLib.IdleSource idle_source = new GLib.IdleSource ();
+      idle_source.set_callback (execute_background.callback);
+
+      Bump.TaskQueue.ThreadCallbackData<G> data = new ThreadCallbackData<G> ();
       data.thread_func = () => {
         try {
           return func ();
         } finally {
-          GLib.Idle.add (this.execute_async.callback);
+          idle_source.attach (thread_context);
         }
       };
-      this.add (data.source_func, priority, cancellable);
+      this.add (data.source_func);
       yield;
 
-      if ( data.error != null ) {
+      if ( data.error != null )
         throw data.error;
-      }
 
       return data.return_value;
     }
-  }
-}
 
-#if BUMP_TEST_TASK_QUEUE
-private static int main (string[] args) {
-  var q = new Bump.TaskQueue ();
-  q.add (() => { GLib.debug ("One"); return false; });
-  q.add (() => { GLib.debug ("Two"); return false; });
-  q.add (() => { GLib.debug ("Three"); return false; });
+    private static unowned TaskQueue? global_queue = null;
 
-  int i = 0;
-  q.add (() => {
-      GLib.debug (":: %d", ++i);
-      return i < 8;
-    }, GLib.Priority.HIGH);
+    construct {
+      this.queue = new Bump.CallbackQueue<Bump.TaskQueue.Data> ();
+      this.queue.consumer_shortage.connect (() => { this.spawn (-1); });
+    }
 
-  while ( q.process (GLib.TimeSpan.SECOND) ) {
-    GLib.debug ("Processed");
-  }
+    /**
+     * Get the global task queue
+     *
+     * This will retrieve a global task queue, creating it if it does
+     * not exist.
+     */
+    public static TaskQueue get_global () {
+      TaskQueue? gp = global_queue;
 
-  GLib.Thread.create<void*> (() => {
-      while ( q.process (GLib.TimeSpan.SECOND) ) { }
-
-      return null;
-    }, false);
-
-  try {
-    GLib.critical ("Failed to catch an error: %s", q.execute<string> (() => {
-          throw new GLib.IOError.FAILED ("Error thrown from callback");
-          return "Should not be reached.";
-        }));
-  } catch ( GLib.Error e ) {
-    GLib.debug ("Caught an error (as expected): %s", e.message);
-  }
-
-  GLib.MainLoop loop = new GLib.MainLoop ();
-
-  q.execute_async<string> (() => {
-      GLib.debug (":)");
-
-      return "Processed asynchronously.";
-    }, GLib.Priority.DEFAULT, null, (obj, async_res) => {
-      // https://bugzilla.gnome.org/show_bug.cgi?id=661961
-      // GLib.debug (q.execute_async.end (async_res));
-      GLib.debug ("Processed asynchronously.");
-    });
-
-  GLib.Idle.add (() => {
-      if ( q.process (GLib.TimeSpan.SECOND) ) {
-        GLib.debug ("Processed (in idle)");
-        return true;
-      } else {
-        GLib.debug ("Timeout");
-        loop.quit ();
-        return false;
+      if ( gp == null ) {
+        lock ( global_queue ) {
+          if ( global_queue == null ) {
+            global_queue = gp = new TaskQueue ();
+            gp.add_weak_pointer (&global_queue);
+          } else {
+            gp = global_queue;
+          }
+        }
       }
-    });
 
-  loop.run ();
-
-  return 0;
+      return gp;
+    }
+  }
 }
-#endif

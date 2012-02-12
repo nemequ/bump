@@ -30,10 +30,11 @@ AC_SUBST(BUMP_API_VERSION)
 
 m4_ifdef([AM_SILENT_RULES],[AM_SILENT_RULES([yes])])
 
-VALA_REQUIRED=0.14.0.55
-GLIB_REQUIRED=2.22.0
+VALA_REQUIRED=0.15.1
+GLIB_REQUIRED=2.31
 GEE_REQUIRED=0.7.2
 
+GLIB_TARGET_VERSION=2.32
 GEE_PACKAGE=gee-0.8
 
 # Checks for programs.
@@ -55,6 +56,7 @@ GLIB_VERSION=$($PKG_CONFIG --modversion glib-2.0)
 AC_SUBST(GLIB_VERSION)
 AC_SUBST(GLIB_CFLAGS)
 AC_SUBST(GLIB_LIBS)
+AC_SUBST(GLIB_TARGET_VERSION)
 PKG_CHECK_MODULES(GOBJECT, gobject-2.0 >= $GLIB_REQUIRED)
 AC_SUBST(GOBJECT_CFLAGS)
 AC_SUBST(GOBJECT_LIBS)
@@ -68,7 +70,7 @@ AC_ARG_ENABLE(valadoc,
     [enable_valadoc=auto])
 
 found_valadoc=no
-AS_IF([test "x$enable_valadoc" != "xno"], [
+AS_IF([test "x$enable_valadoc" = "xyes"], [
     AC_PATH_PROG(VALADOC, valadoc, :)
     AS_IF([test -x "$VALADOC"], [
       found_valadoc=yes

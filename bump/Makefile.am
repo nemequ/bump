@@ -13,10 +13,17 @@ libbump@BUMP_API_VERSION@_la_SOURCES = \
 	bump-callback-queue.vala \
 	bump-claim.vala \
 	bump-event.vala \
-	bump-idle-queue.vala \
-	bump-mutex.vala \
+	bump-queue.vala \
+	bump-resource-claim.vala \
+	bump-resource-pool.vala \
+	bump-semaphore.vala \
+	bump-semaphore-claim.vala \
 	bump-task-queue.vala \
-	bump-thread-pool.vala \
+	bump-threading.vala \
+	$(NULL)
+
+temporarily_disabled =
+	bump-worker.vala \
 	$(NULL)
 
 if HAVE_INTROSPECTION
@@ -51,20 +58,33 @@ bump-@BUMP_API_VERSION@.deps:
 libbump@BUMP_API_VERSION@_la_VALAPKGFLAGS = $(foreach pkg_config_name,$(libbump@BUMP_API_VERSION@_la_PKG_DEPENDS),--pkg $(pkg_config_name))
 
 if ENABLE_VALADOC
-devhelp: $(libbump@BUMP_API_VERSION@_la_SOURCES)
+devhelp html: $(libbump@BUMP_API_VERSION@_la_SOURCES)
 	$(AM_V_GEN) $(VALADOC) --force -o $@/ \
+	  --target-glib $(GLIB_TARGET_VERSION) \
 	  --package-name=bump \
 	  --package-version=@BUMP_API_VERSION@ \
 	  --doclet $@ \
-	  --driver 0.13.x \
 	  $(libbump@BUMP_API_VERSION@_la_VALAPKGFLAGS) \
 	  $(libbump@BUMP_API_VERSION@_la_SOURCES)
+
+gtkdoc: $(libbump@BUMP_API_VERSION@_la_SOURCES)
+	$(AM_V_GEN) $(VALADOC) --force -o $@/ \
+	  --target-glib $(GLIB_TARGET_VERSION) \
+	  --package-name=bump \
+	  --package-version=@BUMP_API_VERSION@ \
+	  --doclet $@ \
+	  $(libbump@BUMP_API_VERSION@_la_VALAPKGFLAGS) \
+	  $(libbump@BUMP_API_VERSION@_la_SOURCES) \
+	  -X --ignore-headers \
+	  -X $(srcdir)/bump-@BUMP_API_VERSION@-internal.h \
+	  -X $(srcdir)/bump.h \
+	  -X -l -X $(builddir)/.libs${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}/libbump@BUMP_API_VERSION@.so
 endif
 
 libbump@BUMP_API_VERSION@_la_VALAFLAGS = \
 	$(GIR_BUMP_VALAFLAGS) \
 	--library bump-@BUMP_API_VERSION@ \
-	--target-glib 2.24 \
+	--target-glib $(GLIB_TARGET_VERSION) \
 	--vapi bump-@BUMP_API_VERSION@.vapi \
 	-H bump.h \
 	--use-header \
