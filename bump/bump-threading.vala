@@ -5,29 +5,15 @@ namespace Bump {
   public interface Threading : GLib.Object, Bump.Queue {
     private const string PRIVATE_DATA_NAME = "__BumpThreading_private_data__";
 
-    private struct Data {
-      public GLib.Mutex mutex;
-      public int max_threads;
-      public GLib.TimeSpan max_idle_time;
-      public int num_threads;
-      public int idle_threads;
-
-      public GLib.HashTable<GLib.Thread<void*>,unowned GLib.Thread<void*>>? threads;
-
-      public static void* alloc () {
-        Threading.Data* data = GLib.Slice.alloc0 (sizeof (Threading.Data));
-        data->mutex.init ();
-        data->max_threads = -1;
-        data->max_idle_time = GLib.TimeSpan.SECOND;
-        data->threads = new GLib.HashTable<GLib.Thread,GLib.Thread> (GLib.direct_hash, GLib.direct_equal);
-        return data;
-      }
-
-      public static void dealloc (void* ptr) {
-        Threading.Data* data = (Threading.Data*) ptr;
-        data->threads = null;
-        GLib.Slice.free (sizeof (Threading.Data), ptr);
-      }
+    [Compact]
+    private class Data {
+      public GLib.Mutex mutex = GLib.Mutex ();
+      public int max_threads = -1;
+      public GLib.TimeSpan max_idle_time = GLib.TimeSpan.SECOND;
+      public int num_threads = 0;
+      public int idle_threads = 0;
+      public GLib.HashTable<GLib.Thread<void*>,unowned GLib.Thread<void*>>? threads =
+        new GLib.HashTable<GLib.Thread,GLib.Thread> (GLib.direct_hash, GLib.direct_equal);
     }
 
     /**
@@ -38,11 +24,12 @@ namespace Bump {
      *
      * @return pointer to the private data
      */
-    private Threading.Data* get_private_data () {
-      Threading.Data* data = this.get_data<Threading.Data*> (PRIVATE_DATA_NAME);
+    private unowned Threading.Data get_private_data () {
+      unowned Threading.Data data = this.get_data<unowned Threading.Data> (PRIVATE_DATA_NAME);
       if ( data == null ) {
-        data = Threading.Data.alloc ();
-        this.set_data_full (PRIVATE_DATA_NAME, data, Threading.Data.dealloc);
+        Threading.Data new_data = new Threading.Data ();
+        data = new_data;
+        this.set_data<Threading.Data> (PRIVATE_DATA_NAME, (owned) new_data);
       }
       return data;
     }
@@ -60,7 +47,7 @@ namespace Bump {
      * @see increase_max_threads
      */
     public int get_max_threads () {
-      return ((Threading.Data*) this.get_private_data ()).max_threads;
+      return this.get_private_data ().max_threads;
     }
 
     /**
@@ -79,10 +66,10 @@ namespace Bump {
      * @see increase_max_threads
      */
     public void set_max_threads (int value) {
-      Threading.Data* data = (Threading.Data*) this.get_private_data ();
-      data->mutex.lock ();
-      data->max_threads = value;
-      data->mutex.unlock ();
+      unowned Threading.Data data = this.get_private_data ();
+      data.mutex.lock ();
+      data.max_threads = value;
+      data.mutex.unlock ();
     }
 
     /**
@@ -95,7 +82,7 @@ namespace Bump {
      * @see set_max_idle_time
      */
     public GLib.TimeSpan get_max_idle_time () {
-      return ((Threading.Data*) this.get_private_data ()).max_idle_time;
+      return this.get_private_data ().max_idle_time;
     }
 
     /**
@@ -112,10 +99,10 @@ namespace Bump {
      * @see set_max_idle_time
      */
     public void set_max_idle_time (GLib.TimeSpan value) {
-      Threading.Data* data = (Threading.Data*) this.get_private_data ();
-      data->mutex.lock ();
-      data->max_idle_time = value;
-      data->mutex.unlock ();
+      unowned Threading.Data data = this.get_private_data ();
+      data.mutex.lock ();
+      data.max_idle_time = value;
+      data.mutex.unlock ();
     }
 
     /**
@@ -125,7 +112,7 @@ namespace Bump {
      * @see idle_threads
      */
     public int get_num_threads () {
-      return ((Threading.Data*) this.get_private_data ()).num_threads;
+      return this.get_private_data ().num_threads;
     }
 
     /**
@@ -134,7 +121,7 @@ namespace Bump {
      * @return number of threads waiting for input
      */
     public int get_idle_threads () {
-      return ((Threading.Data*) this.get_private_data ()).idle_threads;
+      return this.get_private_data ().idle_threads;
     }
 
     /**
@@ -150,13 +137,13 @@ namespace Bump {
      * @see get_max_threads
      */
     public void increase_max_threads (int new_max_threads) {
-      Threading.Data* data = (Threading.Data*) this.get_private_data ();
-      if ( data->max_threads > 0 && data->max_threads < new_max_threads ) {
-        data->mutex.lock ();
-        if ( data->max_threads > 0 && data->max_threads < new_max_threads ) {
-          data->max_threads = new_max_threads;
+      unowned Threading.Data data = this.get_private_data ();
+      if ( data.max_threads > 0 && data.max_threads < new_max_threads ) {
+        data.mutex.lock ();
+        if ( data.max_threads > 0 && data.max_threads < new_max_threads ) {
+          data.max_threads = new_max_threads;
         }
-        data->mutex.unlock ();
+        data.mutex.unlock ();
       }
     }
 
@@ -170,29 +157,27 @@ namespace Bump {
      * @return value returned by the callback
      */
     protected bool run_task (GLib.SourceFunc func) {
-      Threading.Data* data = (Threading.Data*) this.get_private_data ();
+      unowned Threading.Data data = this.get_private_data ();
 
-      if ( data->threads.contains (GLib.Thread.self<void*> ()) ) {
-        GLib.AtomicInt.add (ref data->idle_threads, -1);
+      if ( data.threads.contains (GLib.Thread.self<void*> ()) ) {
+        GLib.AtomicInt.add (ref data.idle_threads, -1);
         bool res = func ();
-        GLib.AtomicInt.inc (ref data->idle_threads);
+        GLib.AtomicInt.inc (ref data.idle_threads);
         return res;
       } else {
-        //GLib.warning ("Threading.run_task called from unmanaged thread");
         return func ();
       }
     }
 
     private void* thread_callback () {
-      Threading.Data* internal_data = (Threading.Data*) this.get_private_data ();
+      unowned Threading.Data internal_data = this.get_private_data ();
 
-      while ( this.process (internal_data->max_idle_time) ) { }
+      while ( this.process (internal_data.max_idle_time) ) { }
 
-      internal_data->mutex.lock ();
-      internal_data->num_threads--;
-      if ( !internal_data->threads.remove (GLib.Thread.self<void*> ()) )
-        GLib.critical ("Thread was not managed");
-      internal_data->mutex.unlock ();
+      internal_data.mutex.lock ();
+      internal_data.num_threads--;
+      internal_data.threads.remove (GLib.Thread.self<void*> ());
+      internal_data.mutex.unlock ();
 
       this.unref ();
 
@@ -207,38 +192,38 @@ namespace Bump {
         return 0;
 
       int threads_to_spawn = max_new_threads;
-      Threading.Data* data = (Threading.Data*) this.get_private_data ();
+      unowned Threading.Data data = this.get_private_data ();
       GLib.assert (data != null);
-      GLib.assert (data->num_threads >= 0);
+      GLib.assert (data.num_threads >= 0);
 
-      if ( data->max_threads == -1 )
-        threads_to_spawn -= data->num_threads;
+      if ( data.max_threads == -1 )
+        threads_to_spawn -= data.num_threads;
       else
-        threads_to_spawn = int.min (threads_to_spawn, data->max_threads - data->num_threads);
+        threads_to_spawn = int.min (threads_to_spawn, data.max_threads - data.num_threads);
 
-      threads_to_spawn -= data->idle_threads;
+      threads_to_spawn -= data.idle_threads;
 
       if ( threads_to_spawn < 1 )
         return 0;
 
-      data->mutex.lock ();
-      if ( data->max_threads != -1 )
-        threads_to_spawn = int.min (threads_to_spawn, data->max_threads - data->num_threads);
-      data->num_threads += threads_to_spawn;
-      data->idle_threads += threads_to_spawn;
-      data->mutex.unlock ();
+      data.mutex.lock ();
+      if ( data.max_threads != -1 )
+        threads_to_spawn = int.min (threads_to_spawn, data.max_threads - data.num_threads);
+      data.num_threads += threads_to_spawn;
+      data.idle_threads += threads_to_spawn;
+      data.mutex.unlock ();
 
       if ( threads_to_spawn < 1 )
         return 0;
 
       // GLib.debug ("Spawning %d threads (currently %d / %d threads, %d requested)",
-      //             threads_to_spawn, data->num_threads, data->max_threads, max_new_threads);
+      //             threads_to_spawn, data.num_threads, data.max_threads, max_new_threads);
 
       string name = "%s[0x%lx]".printf (this.get_type ().name (), (ulong) this);
       for ( int i = 0 ; i < threads_to_spawn ; i++ ) {
         this.ref ();
         GLib.Thread<void*> gthread = new GLib.Thread<void*> (name, this.thread_callback);
-        data->threads.add (gthread);
+        data.threads.add (gthread);
       }
 
       return threads_to_spawn;
