@@ -250,8 +250,6 @@ namespace Bump {
      *
      * @param auto_reset whether to automatically reset the event
      *   after the handlers have been invoked
-     * @param pool the pool to use to execute background tasks, or
-     *   null for the default
      */
     public Event (bool auto_reset = true) {
       GLib.Object (auto_reset: auto_reset);

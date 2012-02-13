@@ -39,12 +39,14 @@ namespace Bump {
      *
      * Note that this isn't necessarily the maximum number of threads
      * which could be in use, since threads spawned prior to lowering
-     * this value will not be destroyed until {@link max_idle_time} is
+     * this value will not be destroyed until the maximum idle time is
      * exceeded.
      *
      * @return the maximum number of threads, or -1 for unlimited
      * @see set_max_threads
      * @see increase_max_threads
+     * @see get_max_idle_time
+     * @see set_max_idle_time
      */
     public int get_max_threads () {
       return this.get_private_data ().max_threads;
@@ -55,7 +57,7 @@ namespace Bump {
      *
      * Note that this isn't necessarily the maximum number of threads
      * which could be in use, since threads spawned prior to lowering
-     * this value will not be destroyed until {@link max_idle_time} is
+     * this value will not be destroyed until max idle time is
      * exceeded.
      *
      * If you want to increase the maximum number of threads, you
@@ -94,8 +96,8 @@ namespace Bump {
      * waiting thread, though the thread will pick up the new value
      * next time it needs to wait.
      *
-     * @value maximum amount of time (in microseconds) to allow a
-     *   thread to remain unused before removing it
+     * @param value maximum amount of time (in microseconds) to allow
+     *   a thread to remain unused before removing it
      * @see set_max_idle_time
      */
     public void set_max_idle_time (GLib.TimeSpan value) {
@@ -109,7 +111,7 @@ namespace Bump {
      * Total number of threads currently running
      *
      * @return number of threads currently running
-     * @see idle_threads
+     * @see get_idle_threads
      */
     public int get_num_threads () {
       return this.get_private_data ().num_threads;
@@ -233,8 +235,8 @@ namespace Bump {
      * Possibly spawn new thread(s)
      *
      * This method will spawn up to max_new_threads new threads if no
-     * constraints (i.e., {@link max_threads}) would be violated by
-     * doing so.
+     * constraints (i.e., maximum number of threads) would be violated
+     * by doing so.
      *
      * @param max_new_threads the maximum number of new threads to
      *   spawn, or -1 for unlimited

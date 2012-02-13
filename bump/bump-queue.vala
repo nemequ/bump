@@ -1,4 +1,7 @@
 namespace Bump {
+  /**
+   * A Queue
+   */
   public interface Queue : GLib.Object {
     /**
      * The number of items currently queued
