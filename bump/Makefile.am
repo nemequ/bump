@@ -2,8 +2,6 @@ include $(top_srcdir)/Makefile.decl
 
 NULL = 
 
-SUBDIRS = tests
-
 CLEANFILES =
 
 lib_LTLIBRARIES = \
