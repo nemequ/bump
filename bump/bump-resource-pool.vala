@@ -224,7 +224,12 @@ namespace Bump {
       return res.resource;
     }
 
-    private void release_without_unlock (T resource) {
+    /**
+     * Release a resource into the pool
+     *
+     * @param resource the resource to release
+     */
+    public virtual void release (T resource) {
       ResourcePool.Resource<T>? res = null;
 
       lock ( this.active_resources_ht ) {
@@ -244,15 +249,6 @@ namespace Bump {
         if ( this.cleanup_source == 0 )
           this.cleanup_source = GLib.Timeout.add_seconds ((uint) int64.max (1, this.max_idle_time / GLib.TimeSpan.SECOND), this.cleanup);
       }
-    }
-
-    /**
-     * Release a resource into the pool
-     *
-     * @param resource the resource to release
-     */
-    public void release (T resource) {
-      this.release_without_unlock (resource);
 
       if ( this.resource_lock is Bump.Semaphore ) {
         ((Bump.Semaphore) this.resource_lock).unlock ();
