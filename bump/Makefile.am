@@ -57,7 +57,7 @@ if ENABLE_VALADOC
 devhelp html: $(libbump@BUMP_API_VERSION@_la_SOURCES)
 	$(AM_V_GEN) $(VALADOC) --force -o $@/ \
 	  --target-glib $(GLIB_TARGET_VERSION) \
-	  --package-name=bump \
+	  --package-name=bump-@BUMP_API_VERSION@ \
 	  --package-version=@BUMP_API_VERSION@ \
 	  --doclet $@ \
 	  $(libbump@BUMP_API_VERSION@_la_VALAPKGFLAGS) \
