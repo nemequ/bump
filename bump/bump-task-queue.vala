@@ -3,8 +3,8 @@ namespace Bump {
    * Callback which is invoked by the {@link TaskQueue.execute} and
    * {@link TaskQueue.execute_async} functions.
    *
-   * This is similar to GThreadFunc, except the delegate can throw
-   * exceptions.
+   * This is similar to {@link GLib.ThreadFunc}, except the delegate
+   * can throw exceptions.
    */
   public delegate G Callback<G> () throws GLib.Error;
 
