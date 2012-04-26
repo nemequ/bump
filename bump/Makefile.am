@@ -13,6 +13,7 @@ libbump@BUMP_API_VERSION@_la_SOURCES = \
 	bump-callback-queue.vala \
 	bump-claim.vala \
 	bump-event.vala \
+	bump-lazy.vala \
 	bump-queue.vala \
 	bump-resource-claim.vala \
 	bump-resource-pool.vala \

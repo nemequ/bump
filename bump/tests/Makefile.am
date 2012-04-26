@@ -37,6 +37,9 @@ resource_pool_test_SOURCES = resource-pool-test.vala
 TEST_PROGS += claim-test
 claim_test_SOURCES = claim-test.vala
 
+TEST_PROGS += lazy-test
+lazy_test_SOURCES = lazy-test.vala
+
 GITIGNORE = \
 	$(TEST_PROGS) \
 	$(foreach prog,$(TEST_PROGS),$(subst /,_,$(subst -,_,$(subst .,_,$(prog))))_vala.stamp) \
