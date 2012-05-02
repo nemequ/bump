@@ -178,6 +178,7 @@ namespace Bump {
 
       internal_data.mutex.lock ();
       internal_data.num_threads--;
+      internal_data.idle_threads--;
       internal_data.threads.remove (GLib.Thread.self<void*> ());
       internal_data.mutex.unlock ();
 
@@ -209,17 +210,17 @@ namespace Bump {
         return 0;
 
       data.mutex.lock ();
-      if ( data.max_threads != -1 )
+      if ( data.max_threads != -1 ) {
         threads_to_spawn = int.min (threads_to_spawn, data.max_threads - data.num_threads);
-      data.num_threads += threads_to_spawn;
-      data.idle_threads += threads_to_spawn;
+      }
+      if ( threads_to_spawn >= 0 ) {
+        data.num_threads += threads_to_spawn;
+        data.idle_threads += threads_to_spawn;
+      }
       data.mutex.unlock ();
 
       if ( threads_to_spawn < 1 )
         return 0;
-
-      // GLib.debug ("Spawning %d threads (currently %d / %d threads, %d requested)",
-      //             threads_to_spawn, data.num_threads, data.max_threads, max_new_threads);
 
       string name = "%s[0x%lx]".printf (this.get_type ().name (), (ulong) this);
       for ( int i = 0 ; i < threads_to_spawn ; i++ ) {
