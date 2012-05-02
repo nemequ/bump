@@ -126,7 +126,7 @@ namespace Bump {
     public void add (owned Bump.Event.SourceFunc<T> func, int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
       Bump.Event.Data<T> data = this.prepare (priority, cancellable);
       data.task = (arg) => {
-        var id = GLib.Idle.add (() => {
+        GLib.Idle.add (() => {
             if ( !func (arg) ) {
               this.queue.remove (data);
             }
@@ -217,17 +217,22 @@ namespace Bump {
       R retval = null;
       GLib.Error? err = null;
       Bump.Event.Data<T> data = this.prepare (priority, cancellable);
-      data.task = (arg) => {
-        this.pool.add (() => {
-            try {
-              retval = func (arg);
-              GLib.Idle.add (this.execute_background.callback);
-            } catch ( GLib.Error e ) {
-              err = e;
-            }
 
-            return false;
-          }, priority, cancellable);
+      data.task = (arg) => {
+        try {
+          this.pool.add (() => {
+              try {
+                retval = func (arg);
+              } catch ( GLib.Error e1 ) {
+                err = e1;
+              }
+              GLib.Idle.add (this.execute_background.callback);
+
+              return false;
+            }, priority, cancellable);
+        } catch ( GLib.Error e2 ) {
+          err = e2;
+        }
         return false;
       };
       this.queue.offer (data);

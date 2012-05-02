@@ -70,7 +70,7 @@ namespace Bump {
      * Atomically increment the age, returning the old value
      */
     private int increment_age () {
-      return GLib.AtomicInt.exchange_and_add (ref this._age, 1);
+      return GLib.AtomicInt.add (ref this._age, 1);
     }
 
     public G? peek_timed (GLib.TimeSpan wait = -1) {
