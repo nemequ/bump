@@ -1,6 +1,6 @@
 namespace Bump {
   /**
-   * Object which create other objects
+   * Object which creates other objects
    *
    * In order to acquire an instance of the type the factory creates
    * you should use one of the acquire methods ({@link acquire},
@@ -10,6 +10,14 @@ namespace Bump {
    * except from within acquire implementations.
    */
   public abstract class Factory<G> : GLib.Object {
+    /**
+     * Properties used for GObject construction
+     *
+     * These properties are used by the default implementations of
+     * {@link create}, {@link create_async}, and {@link create_background}.
+     */
+    public GLib.Parameter[]? construct_properties { get; set; default = null; }
+
     /**
      * Create an instance synchronously
      *
@@ -23,7 +31,7 @@ namespace Bump {
      */
     protected virtual G create (int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
       if ( typeof (G).is_a (typeof (GLib.Object)) ) {
-        G? result = (G) GLib.Object.new (typeof (G));
+        G? result = (G) GLib.Object.newv (typeof (G), this.construct_properties);
 
         if ( typeof (G).is_a (typeof (GLib.Initable)) )
           if ( !((GLib.Initable) result).init (cancellable) )
@@ -53,7 +61,7 @@ namespace Bump {
       G? result = null;
 
       if ( typeof (G).is_a (typeof (GLib.AsyncInitable)) ) {
-        result = (G) GLib.Object.new (typeof (G));
+        result = (G) GLib.Object.newv (typeof (G), this.construct_properties);
 
         unowned GLib.AsyncInitable ai = (GLib.AsyncInitable) result;
         bool success = yield ai.init_async (priority, cancellable);

@@ -73,6 +73,20 @@ private void test_lazy_async () {
   loop.run ();
 }
 
+private class ResourceWithProperty : GLib.Object {
+  public string? foo { get; construct; default = null; }
+}
+
+private void test_lazy_properties () {
+  Bump.Lazy<ResourceWithProperty> lazy = new Bump.Lazy<ResourceWithProperty> ();
+  lazy.construct_properties = {
+      GLib.Parameter () { name = "foo", value = "bar" }
+    };
+  ResourceWithProperty res = lazy.value;
+  if ( res.foo != "bar" )
+    GLib.error ("Failed to set GObject property");
+}
+
 public GLib.MainLoop loop;
 
 private static int main (string[] args) {
@@ -83,6 +97,7 @@ private static int main (string[] args) {
   GLib.Test.add_data_func ("/lazy/sync", test_lazy_sync);
   GLib.Test.add_data_func ("/lazy/async", test_lazy_async);
   GLib.Test.add_data_func ("/lazy/concurrent", test_lazy_concurrent);
+  GLib.Test.add_data_func ("/lazy/properties", test_lazy_properties);
 
   return GLib.Test.run ();
 }
