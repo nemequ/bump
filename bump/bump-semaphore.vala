@@ -27,11 +27,23 @@ namespace Bump {
     /**
      * The current number of claims
      */
-    public int claims { get; private set; }
+    public int claims { get; private set; default = 0; }
 
+    /**
+     * Mutex to restrict access to internal structures
+     *
+     * This must never be locked while waiting on user defined code.
+     */
     private GLib.Mutex mutex = GLib.Mutex ();
+
+    /**
+     * Cond which is activated when the lock is released
+     */
     private GLib.Cond cond = GLib.Cond ();
 
+    /**
+     * Outstanding tasks
+     */
     private unowned Bump.CallbackQueue<TaskQueue.Data> queue;
 
     /**
