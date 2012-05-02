@@ -5,16 +5,8 @@ namespace Bump {
    * This class is designed to help manage a group of reusable
    * resources, especially those that are expensive to acquire. The
    * pool will automatically grow, and shrink, as required.
-   *
-   * If the type is a {@link GLib.Object} it will be created with
-   * default values. If it implements either {@link GLib.Initable} or
-   * {@link GLib.AsyncInitable} Bump will also attempt to initialize
-   * it. If the type is not derived from {@link GLib.Object} you
-   * should create a new {@link ResourcePool} subclass and override at
-   * least one of {@link prepare}, {@link prepare_async}, or
-   * {@link prepare_background}.
    */
-  public class ResourcePool<T> : GLib.Object {
+  public class ResourcePool<T> : Bump.Factory<T> {
     /**
      * Delegate type for {@link ResourcePool}
      *
@@ -149,62 +141,6 @@ namespace Bump {
     }
 
     /**
-     * Prepare a resource synchronously
-     *
-     * @param priority the priority with which to prepare the resource
-     * @param cancellable optional cancellable for aborting the opearation
-     * @return the newly prepared resource
-     */
-    protected virtual T prepare (int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
-      if ( typeof (T).is_a (typeof (GLib.Object)) ) {
-        T? result = (T) GLib.Object.new (typeof (T));
-
-        if ( typeof (T).is_a (typeof (GLib.Initable)) )
-          if ( !((GLib.Initable) result).init (cancellable) )
-            throw new GLib.IOError.FAILED ("Unable to initialize a new %s: unknown error.", typeof (T).name);
-
-        return result;
-      } else {
-        throw new GLib.IOError.NOT_SUPPORTED ("Attempted to prepare a %s resource without implementing a method to do so.", typeof (T).name);
-      }
-    }
-
-    /**
-     * Prepare a resource asynchronously
-     *
-     * @param priority the priority with which to prepare the resource
-     * @param cancellable optional cancellable for aborting the opearation
-     * @return the newly prepared resource
-     */
-    protected virtual async T prepare_async (int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
-      T? result = null;
-
-      if ( typeof (T).is_a (typeof (GLib.AsyncInitable)) ) {
-        result = (T) GLib.Object.new (typeof (T));
-
-        unowned GLib.AsyncInitable ai = (GLib.AsyncInitable) result;
-        bool success = yield ai.init_async (priority, cancellable);
-        if ( !success )
-          throw new GLib.IOError.FAILED ("Unable to initialize a new %s: unknown error.", typeof (T).name);
-
-        return result;
-      } else {
-        return yield this.pool.execute_async<T> (() => { return this.prepare (); }, priority, cancellable);
-      }
-    }
-
-    /**
-     * Prepare a resource in a background thread
-     *
-     * @param priority the priority with which to prepare the resource
-     * @param cancellable optional cancellable for aborting the opearation
-     * @return the newly prepared resource
-     */
-    protected virtual async T prepare_background (int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
-      return yield this.pool.execute_background<T> (() => { return this.prepare (); }, priority, cancellable);
-    }
-
-    /**
      * Register a newly acquire resource as active
      *
      * @param resource the resource to register
@@ -280,13 +216,13 @@ namespace Bump {
     /**
      * Synchronously acquire a resource
      *
-     * @param priority the priority with which to prepare the resource
+     * @param priority the priority with which to create the resource
      * @param cancellable optional cancellable for aborting the opearation
      * @return the resource
      * @see acquire_async
      * @see acquire_background
      */
-    public unowned T acquire (int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
+    public override unowned T acquire (int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
       if ( this.resource_lock is Bump.Semaphore )
         ((Bump.Semaphore) this.resource_lock).lock (priority, cancellable);
 
@@ -295,7 +231,7 @@ namespace Bump {
         if ( resource != null )
           return resource;
         else
-          return this.register (this.prepare (priority, cancellable));
+          return this.register (this.create (priority, cancellable));
       } catch ( GLib.Error e ) {
         if ( this.resource_lock is Bump.Semaphore )
           ((Bump.Semaphore) this.resource_lock).unlock ();
@@ -306,13 +242,13 @@ namespace Bump {
     /**
      * Asynchronously acquire a resource
      *
-     * @param priority the priority with which to prepare the resource
+     * @param priority the priority with which to create the resource
      * @param cancellable optional cancellable for aborting the opearation
      * @return the resource
      * @see acquire
      * @see acquire_background
      */
-    public async unowned T acquire_async (int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
+    public override async unowned T acquire_async (int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
       if ( this.resource_lock is Bump.Semaphore )
         yield ((Bump.Semaphore) this.resource_lock).lock_async (priority, cancellable);
 
@@ -321,7 +257,7 @@ namespace Bump {
         if ( resource != null )
           return resource;
         else {
-          return this.register (yield this.prepare_async (priority, cancellable));
+          return this.register (yield this.create_async (priority, cancellable));
         }
       } catch ( GLib.Error e ) {
         if ( this.resource_lock is Bump.Semaphore )
@@ -333,13 +269,13 @@ namespace Bump {
     /**
      * Asynchronously acquire a resource in a background thread
      *
-     * @param priority the priority with which to prepare the resource
+     * @param priority the priority with which to create the resource
      * @param cancellable optional cancellable for aborting the opearation
      * @return the resource
      * @see acquire
      * @see acquire_async
      */
-    public async unowned T acquire_background (int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
+    public override async unowned T acquire_background (int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
       if ( this.resource_lock is Bump.Semaphore )
         yield ((Bump.Semaphore) this.resource_lock).lock_async (priority, cancellable);
 
@@ -348,7 +284,7 @@ namespace Bump {
         if ( resource != null ) {
           return resource;
         } else {
-          return this.register (yield this.prepare_background (priority, cancellable));
+          return this.register (yield this.create_background (priority, cancellable));
         }
       } catch ( GLib.Error e ) {
         if ( this.resource_lock is Bump.Semaphore )
@@ -361,7 +297,7 @@ namespace Bump {
      * Execute a callback which uses a resource
      *
      * @param func the callback to execute
-     * @param priority the priority with which to prepare the resource
+     * @param priority the priority with which to create the resource
      * @param cancellable optional cancellable for aborting the opearation
      * @return the return value from the callback
      * @see execute_async
@@ -380,7 +316,7 @@ namespace Bump {
      * Asynchronously execute a callback which uses a resource
      *
      * @param func the callback to execute
-     * @param priority the priority with which to prepare the resource
+     * @param priority the priority with which to create the resource
      * @param cancellable optional cancellable for aborting the opearation
      * @return the return value from the callback
      * @see execute
@@ -401,7 +337,7 @@ namespace Bump {
      * Execute a callback in a background thread which uses a resource
      *
      * @param func the callback to execute
-     * @param priority the priority with which to prepare the resource
+     * @param priority the priority with which to create the resource
      * @param cancellable optional cancellable for aborting the opearation
      * @return the return value from the callback
      * @see execute
@@ -421,7 +357,7 @@ namespace Bump {
     /**
      * Acquire a claim
      *
-     * @param priority the priority with which to prepare the resource
+     * @param priority the priority with which to create the resource
      * @param cancellable optional cancellable for aborting the opearation
      * @return the newly acquired (and initialized) claim
      * @see claim_async
@@ -435,7 +371,7 @@ namespace Bump {
     /**
      * Acquire a claim asynchronously
      *
-     * @param priority the priority with which to prepare the resource
+     * @param priority the priority with which to create the resource
      * @param cancellable optional cancellable for aborting the opearation
      * @return the newly acquired (and initialized) claim
      * @see claim

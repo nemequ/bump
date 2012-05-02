@@ -139,7 +139,6 @@ namespace Bump {
      */
     public virtual G execute<G> (Callback<G> func, int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
       GLib.Mutex mutex = GLib.Mutex ();
-      ThreadCallbackData<G> data = new ThreadCallbackData<G> ();
 
       mutex.lock ();
       this.add (() => {

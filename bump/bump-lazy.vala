@@ -2,7 +2,7 @@ namespace Bump {
   /**
    * Lazy initializer
    */
-  public class Lazy<T> : GLib.Object {
+  public class Lazy<T> : Bump.Factory<T> {
     /**
      * Pool used to process requests
      */
@@ -16,127 +16,90 @@ namespace Bump {
     /**
      * The actual value
      */
-    private T? value = null;
+    private T? _value = null;
+
+    /**
+     * The value
+     *
+     * This is roughly equivalent to calling {@link acquire}
+     */
+    public T value {
+      get {
+        unowned T? value = null;
+        try {
+          value = this.acquire ();
+        } catch ( GLib.Error e ) {
+          GLib.critical (e.message);
+        }
+        return value;
+      }
+    }
 
     /**
      * Whether or not the value has already been initialized
      */
     public bool is_initialized {
       get {
-        return this.value != null;
+        return this._value != null;
       }
     }
 
-    /**
-     * Prepare a resource synchronously
-     *
-     * @return the newly prepared resource
-     */
-    protected virtual T prepare () throws GLib.Error {
-      if ( typeof (T).is_a (typeof (GLib.Object)) ) {
-        T? result = (T) GLib.Object.new (typeof (T));
-
-        if ( typeof (T).is_a (typeof (GLib.Initable)) )
-          if ( !((GLib.Initable) result).init (null) )
-            throw new GLib.IOError.FAILED ("Unable to initialize a new %s: unknown error.", typeof (T).name);
-
-        return result;
-      } else {
-        throw new GLib.IOError.NOT_SUPPORTED ("Attempted to prepare a %s resource without implementing a method to do so.", typeof (T).name);
-      }
-    }
+    private static int lock_cnt = 0;
 
     /**
-     * Prepare a resource asynchronously
-     *
-     * @return the newly prepared resource
+     * {@inheritDoc}
      */
-    protected virtual async T prepare_async () throws GLib.Error {
-      T? result = null;
-
-      if ( typeof (T).is_a (typeof (GLib.AsyncInitable)) ) {
-        result = (T) GLib.Object.new (typeof (T));
-
-        unowned GLib.AsyncInitable ai = (GLib.AsyncInitable) result;
-        bool success = yield ai.init_async (GLib.Priority.DEFAULT, null);
-        if ( !success )
-          throw new GLib.IOError.FAILED ("Unable to initialize a new %s: unknown error.", typeof (T).name);
-
-        return result;
-      } else {
-        return yield this.pool.execute_async<T> (() => { return this.prepare (); });
-      }
-    }
-
-    /**
-     * Prepare a resource in a background thread
-     *
-     * @return the newly prepared resource
-     */
-    protected virtual async T prepare_background () throws GLib.Error {
-      return yield this.pool.execute_background<T> (() => { return this.prepare (); });
-    }
-
-    /**
-     * Retrieve the value, initializing it if necessary
-     *
-     * @return the value
-     */
-    public unowned T get_value () throws GLib.Error {
-      if ( this.value == null ) {
+    public override unowned T acquire (int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
+      if ( this._value == null ) {
+        GLib.AtomicInt.add (ref lock_cnt, 1);
         this.sem.lock ();
+
         try {
-          if ( this.value == null ) {
-            this.value = this.prepare ();
+          if ( this._value == null ) {
+            this._value = this.create (priority, cancellable);
           }
         } finally {
           this.sem.unlock ();
         }
       }
 
-      return this.value;
+      return this._value;
     }
 
     /**
-     * Retrieve the value, initializing it in an idle callback if
-     * necessary
-     *
-     * @return the value
+     * {@inheritDoc}
      */
-    public async unowned T get_value_async () throws GLib.Error {
-      if ( this.value == null ) {
+    public override async unowned T acquire_async (int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
+      if ( this._value == null ) {
         yield this.sem.lock_async ();
         try {
-          if ( this.value == null ) {
-            this.value = yield this.prepare_async ();
+          if ( this._value == null ) {
+            this._value = yield this.create_async (priority, cancellable);
           }
         } finally {
           this.sem.unlock ();
         }
       }
 
-      return this.value;
+      return this._value;
     }
 
     /**
-     * Retrieve the value, initializing it in the background if
-     * necessary
-     *
-     * @return the value
+     * {@inheritDoc}
      */
-    public async unowned T get_value_background () throws GLib.Error {
-      if ( this.value == null ) {
+    public override async unowned T acquire_background (int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
+      if ( this._value == null ) {
         yield this.sem.lock_async ();
         try {
-          if ( this.value == null ) {
-            this.value = yield this.prepare_background ();
+          if ( this._value == null ) {
+            this._value = yield this.create_background (priority, cancellable);
           }
         } finally {
           this.sem.unlock ();
         }
       }
 
-      return this.value;
+      return this._value;
     }
 
     construct {
