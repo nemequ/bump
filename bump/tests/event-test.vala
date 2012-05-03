@@ -8,14 +8,22 @@ private async void test_event_execute_async_parallel_async (GLib.MainLoop loop) 
     evt.execute_async<string> ((arg) => {
         return arg;
       }, GLib.Priority.DEFAULT, null, (o, async_res) => {
-        GLib.assert (evt.execute_async.end<string> (async_res) == argument);
+        try {
+          GLib.assert (evt.execute_async.end<string> (async_res) == argument);
+        } catch ( GLib.Error e ) {
+          GLib.error (e.message);
+        }
         if ( --remaining == 0 ) {
           loop.quit ();
         }
       });
   }
 
-  evt.trigger (argument);
+  try {
+    evt.trigger (argument);
+  } catch ( GLib.Error e ) {
+    GLib.error (e.message);
+  }
 }
 
 /**
@@ -41,15 +49,23 @@ private async void test_event_execute_async_sequential_async () {
     int x = i;
 
     GLib.Timeout.add (10, () => {
-        evt.trigger (x);
+        try {
+          evt.trigger (x);
+        } catch ( GLib.Error e ) {
+          GLib.error (e.message);
+        }
         return false;
       });
 
-    string ret = yield evt.execute_async<string> ((arg) => {
-        GLib.assert (arg == x);
-        return argument;
-      });
-    GLib.assert (ret == argument);
+    try {
+      string ret = yield evt.execute_async<string> ((arg) => {
+          GLib.assert (arg == x);
+          return argument;
+        });
+      GLib.assert (ret == argument);
+    } catch ( GLib.Error e ) {
+      GLib.error (e.message);
+    }
   }
 }
 
@@ -78,18 +94,27 @@ private void test_event_execute () {
   string argument = "Foo";
 
   if ( GLib.Test.trap_fork (GLib.TimeSpan.SECOND, GLib.TestTrapFlags.SILENCE_STDOUT | GLib.TestTrapFlags.SILENCE_STDERR) ) {
-    unowned GLib.Thread<string> thread = GLib.Thread.create<string> (() => {
-        string res = evt.execute<string> ((arg) => {
-            GLib.debug (arg);
-            return arg;
-          });
-        return res;
-      }, true);
-    // Make sure we connect before triggering the event
-    GLib.Thread.usleep ((long) GLib.TimeSpan.SECOND / 10);
+    try {
+      GLib.Thread<string> thread = new GLib.Thread<string> ("execute", () => {
+          try {
+            string res = evt.execute<string> ((arg) => {
+                GLib.debug (arg);
+                return arg;
+              });
+            return res;
+          } catch ( GLib.Error e ) {
+            GLib.error (e.message);
+          }
+        });
 
-    evt.trigger (argument);
-    GLib.assert (thread.join () == argument);
+      // Make sure we connect before triggering the event
+      GLib.Thread.usleep ((long) GLib.TimeSpan.SECOND / 10);
+
+      evt.trigger (argument);
+      GLib.assert (thread.join () == argument);
+    } catch ( GLib.Error e ) {
+      GLib.error (e.message);
+    }
     GLib.Process.exit (0);
   }
   GLib.Test.trap_assert_passed ();
@@ -104,47 +129,63 @@ private void test_event_data () {
   string argument = "Foo";
   int outstanding_tasks = 3;
 
-  evt.add ((arg) => {
-      GLib.assert (arg == argument);
+  try {
+    evt.add ((arg) => {
+        GLib.assert (arg == argument);
 
-      if ( GLib.AtomicInt.dec_and_test (ref outstanding_tasks) )
-        loop.quit ();
+        if ( GLib.AtomicInt.dec_and_test (ref outstanding_tasks) )
+          loop.quit ();
 
-      return false;
-    });
+        return false;
+      });
 
-  evt.execute_async<string> ((arg) => {
-      GLib.assert (arg == argument);
+    evt.execute_async<string> ((arg) => {
+        GLib.assert (arg == argument);
 
-      return arg;
-    }, GLib.Priority.DEFAULT, null, (o, async_res) => {
-      GLib.assert (evt.execute_async.end<string> (async_res) == argument);
+        return arg;
+      }, GLib.Priority.DEFAULT, null, (o, async_res) => {
+        try {
+          GLib.assert (evt.execute_async.end<string> (async_res) == argument);
+        } catch ( GLib.Error e ) {
+          GLib.error (e.message);
+        }
 
-      if ( GLib.AtomicInt.dec_and_test (ref outstanding_tasks) )
-        loop.quit ();
-    });
+        if ( GLib.AtomicInt.dec_and_test (ref outstanding_tasks) )
+          loop.quit ();
+      });
 
-  evt.execute_background<string> ((arg) => {
-      GLib.assert (arg == argument);
+    evt.execute_background<string> ((arg) => {
+        GLib.assert (arg == argument);
 
-      return arg;
-    }, GLib.Priority.DEFAULT, null, (o, async_res) => {
-      GLib.assert (evt.execute_async.end<string> (async_res) == argument);
+        return arg;
+      }, GLib.Priority.DEFAULT, null, (o, async_res) => {
+        try {
+          GLib.assert (evt.execute_async.end<string> (async_res) == argument);
+        } catch ( GLib.Error e ) {
+          GLib.error (e.message);
+        }
 
-      if ( GLib.AtomicInt.dec_and_test (ref outstanding_tasks) )
-        loop.quit ();
-    });
+        if ( GLib.AtomicInt.dec_and_test (ref outstanding_tasks) )
+          loop.quit ();
+      });
 
-  GLib.Idle.add (() => {
-      evt.trigger (argument);
-      return false;
-    });
+    GLib.Idle.add (() => {
+        try {
+          evt.trigger (argument);
+        } catch ( GLib.Error e ) {
+          GLib.error (e.message);
+        }
+        return false;
+      });
 
-  if ( GLib.Test.trap_fork (GLib.TimeSpan.SECOND, GLib.TestTrapFlags.SILENCE_STDOUT | GLib.TestTrapFlags.SILENCE_STDERR) ) {
-    loop.run ();
-    GLib.Process.exit (0);
+    if ( GLib.Test.trap_fork (GLib.TimeSpan.SECOND, GLib.TestTrapFlags.SILENCE_STDOUT | GLib.TestTrapFlags.SILENCE_STDERR) ) {
+      loop.run ();
+      GLib.Process.exit (0);
+    }
+    GLib.Test.trap_assert_passed ();
+  } catch ( GLib.Error e ) {
+    GLib.error (e.message);
   }
-  GLib.Test.trap_assert_passed ();
 }
 
 private static int main (string[] args) {

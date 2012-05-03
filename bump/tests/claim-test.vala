@@ -4,7 +4,11 @@ private void test_claim_basic () {
   GLib.SList<Bump.Claim> claims = new GLib.SList<Bump.Claim> ();
 
   for ( int i = 0 ; i < claims_count ; i++ ) {
-    claims.prepend (sem.claim ());
+    try {
+      claims.prepend (sem.claim ());
+    } catch ( GLib.Error e ) {
+      GLib.error (e.message);
+    }
   }
 
   if ( sem.claims != 8 )
@@ -12,17 +16,21 @@ private void test_claim_basic () {
 }
 
 private void test_claim_reporting () {
-  Bump.Semaphore sem = new Bump.Semaphore (1);
-  Bump.Claim claim = sem.claim ();
+  try {
+    Bump.Semaphore sem = new Bump.Semaphore (1);
+    Bump.Claim claim = sem.claim ();
 
-  GLib.Thread.usleep ((long) GLib.TimeSpan.MILLISECOND * 9);
-  claim.release ();
+    GLib.Thread.usleep ((long) GLib.TimeSpan.MILLISECOND * 9);
+    claim.release ();
 
-  if ( claim.duration_held != claim.duration_held )
-    GLib.error ("Claim clock is still going");
-  // else if ( claim.duration_held > GLib.TimeSpan.MILLISECOND * 10 )
-  //   GLib.error ("Claim held for longer than expected (%lld, expected between %lld and %lld)",
-  //               claim.duration_held, GLib.TimeSpan.MILLISECOND * 9, GLib.TimeSpan.MILLISECOND * 10);
+    if ( claim.duration_held != claim.duration_held )
+      GLib.error ("Claim clock is still going");
+    // else if ( claim.duration_held > GLib.TimeSpan.MILLISECOND * 10 )
+    //   GLib.error ("Claim held for longer than expected (%lld, expected between %lld and %lld)",
+    //               claim.duration_held, GLib.TimeSpan.MILLISECOND * 9, GLib.TimeSpan.MILLISECOND * 10);
+  } catch ( GLib.Error e ) {
+    GLib.error (e.message);
+  }
 }
 
 private void test_claim_resource_pool () {
@@ -39,7 +47,7 @@ private void test_claim_resource_pool () {
       GLib.AtomicInt.add (ref active, 1);
 
       Bump.ResourceClaim<Bump.Semaphore> claim = pool.claim ();
-      unowned Bump.Semaphore? resource = sem;
+      unowned Bump.Semaphore? resource = claim.resource;
 
       if ( sem == null )
         sem = resource;

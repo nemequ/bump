@@ -1,9 +1,13 @@
 private void test_resource_pool_acquire () {
   Bump.ResourcePool<Bump.Semaphore> pool = new Bump.ResourcePool<Bump.Semaphore> ();
 
-  Bump.Semaphore sem = pool.acquire ();
-  GLib.assert (sem is Bump.Semaphore);
-  pool.release (sem);
+  try {
+    Bump.Semaphore sem = pool.acquire ();
+    GLib.assert (sem is Bump.Semaphore);
+    pool.release (sem);
+  } catch ( GLib.Error e ) {
+    GLib.error (e.message);
+  }
 }
 
 private void test_resource_pool_recycle () {
@@ -15,14 +19,22 @@ private void test_resource_pool_recycle () {
     new GLib.HashTable<unowned Bump.Semaphore,unowned Bump.Semaphore> (GLib.direct_hash, GLib.direct_equal);
 
   for ( i = 0 ; i < 32 ; i++ ) {
-    sem = pool.acquire ();
+    try {
+      sem = pool.acquire ();
+    } catch ( GLib.Error e ) {
+      GLib.error (e.message);
+    }
     ht[sem] = sem;
   }
 
   ht.foreach ((k, v) => { pool.release (k); });
 
   for ( i = 0 ; i < 32 ; i++ ) {
-    sem = pool.acquire ();
+    try {
+      sem = pool.acquire ();
+    } catch ( GLib.Error e ) {
+      GLib.error (e.message);
+    }
     GLib.assert (ht[sem] == sem);
     ht.remove (sem);
   }
@@ -39,7 +51,11 @@ private void test_resource_pool_cleanup () {
     new GLib.HashTable<unowned Bump.Semaphore,unowned Bump.Semaphore> (GLib.direct_hash, GLib.direct_equal);
 
   for ( i = 0 ; i < 32 ; i++ ) {
-    sem = pool.acquire ();
+    try {
+      sem = pool.acquire ();
+    } catch ( GLib.Error e ) {
+      GLib.error (e.message);
+    }
     ht[sem] = sem;
   }
   ht.foreach ((k, v) => { pool.release (k); });
@@ -61,8 +77,6 @@ private void test_resource_pool_max_resources () {
   int completed = 0;
 
   unowned Bump.Semaphore? sem = null;
-
-  GLib.Thread<void*> main_thread = GLib.Thread.self<void*> ();
 
   for ( int i = 0 ; i < iterations ; i++ ) {
     pool.execute_background<void*> ((resource) => {

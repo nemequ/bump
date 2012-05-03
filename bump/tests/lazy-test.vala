@@ -5,27 +5,35 @@ private class Resource : GLib.Object {
 private void test_lazy_sync () {
   Bump.Lazy<Resource> lazy = new Bump.Lazy<Resource> ();
 
-  unowned Resource? res = lazy.acquire ();
-  for ( int i = 0 ; i < 16 ; i++ ) {
-    if ( res != lazy.acquire () ) {
-      GLib.error ("Unexpected change in value");
+  try {
+    unowned Resource? res = lazy.acquire ();
+    for ( int i = 0 ; i < 16 ; i++ ) {
+      if ( res != lazy.acquire () ) {
+        GLib.error ("Unexpected change in value");
+      }
+      if ( res.initializer != GLib.Thread.self<void*> () ) {
+        GLib.error ("Resource initialized from a different thread");
+      }
     }
-    if ( res.initializer != GLib.Thread.self<void*> () ) {
-      GLib.error ("Resource initialized from a different thread");
-    }
+  } catch ( GLib.Error e ) {
+    GLib.error (e.message);
   }
 }
 
 private async void test_lazy_exec_async () {
-  Bump.Lazy<Resource>? lazy = new Bump.Lazy<Resource> ();
-  Resource? res = yield lazy.acquire_background ();
-  if ( res.initializer == GLib.Thread.self<void*> () ) {
-    GLib.error ("Resource not initialized in background");
-  }
-  for ( int i = 0 ; i < 16 ; i++ ) {
-    if ( res != yield lazy.acquire_background () ) {
-      GLib.error ("Unexpected change in value");
+  try {
+    Bump.Lazy<Resource>? lazy = new Bump.Lazy<Resource> ();
+    Resource? res = yield lazy.acquire_background ();
+    if ( res.initializer == GLib.Thread.self<void*> () ) {
+      GLib.error ("Resource not initialized in background");
     }
+    for ( int i = 0 ; i < 16 ; i++ ) {
+      if ( res != yield lazy.acquire_background () ) {
+        GLib.error ("Unexpected change in value");
+      }
+    }
+  } catch ( GLib.Error e ) {
+    GLib.error (e.message);
   }
 }
 
@@ -39,7 +47,6 @@ private void test_lazy_concurrent () {
   Bump.Lazy<DelayedResource> lazy = new Bump.Lazy<DelayedResource> ();
   const int n = 16;
   int remaining = n;
-  Bump.TaskQueue pool = Bump.TaskQueue.get_global ();
   unowned DelayedResource? res = null;
 
   GLib.Thread.usleep ((ulong) GLib.TimeSpan.MILLISECOND * 100);
@@ -50,14 +57,18 @@ private void test_lazy_concurrent () {
     // for testing purposes only. I want to make sure to launch one
     // thread per item, and never recycle the thread.
     new GLib.Thread<void*> ("concurrent#%d".printf (x), () => {
-        unowned DelayedResource? r = lazy.acquire ();
+        try {
+          unowned DelayedResource? r = lazy.acquire ();
 
-        if ( res != null && r != res ) {
-          GLib.error ("Unexpected change in value");
-        }
+          if ( res != null && r != res ) {
+            GLib.error ("Unexpected change in value");
+          }
 
-        if ( GLib.AtomicInt.dec_and_test (ref remaining) ) {
-          loop.quit ();
+          if ( GLib.AtomicInt.dec_and_test (ref remaining) ) {
+            loop.quit ();
+          }
+        } catch ( GLib.Error e ) {
+          GLib.error (e.message);
         }
 
         return null;
