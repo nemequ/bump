@@ -161,9 +161,9 @@ namespace Bump {
     public void @lock (int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
       GLib.Mutex mut = GLib.Mutex ();
 
-      if ( this.queue.length == 0 ) {
+      if ( this.queue.length == 0 && this.claims < this.max_claims ) {
         this.mutex.lock ();
-        if ( this.queue.length == 0 ) {
+        if ( this.queue.length == 0 && this.claims < this.max_claims ) {
           this.claims++;
           this.mutex.unlock ();
           return;
