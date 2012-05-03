@@ -159,9 +159,18 @@ namespace Bump {
      * @see lock_async
      */
     public void @lock (int priority = GLib.Priority.DEFAULT, GLib.Cancellable? cancellable = null) throws GLib.Error {
-      // TODO: easy to optimize this a bit for when there is no
-      // resource contention.
       GLib.Mutex mut = GLib.Mutex ();
+
+      if ( this.queue.length == 0 ) {
+        this.mutex.lock ();
+        if ( this.queue.length == 0 ) {
+          this.claims++;
+          this.mutex.unlock ();
+          return;
+        }
+        this.mutex.unlock ();
+      }
+
       mut.lock ();
 
       this.add_without_unlock (() => {
