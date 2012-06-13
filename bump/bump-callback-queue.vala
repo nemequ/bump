@@ -103,7 +103,7 @@ namespace Bump {
      * Add the item to the queue
      *
      * This will assume that the data is properly configured (the
-     * cancellable is connected, ower is set, etc.).
+     * cancellable is connected, owner is set, etc.).
      */
     internal void requeue (Bump.CallbackQueue.Data data) {
       data.age = this.increment_age ();
