@@ -83,7 +83,7 @@ namespace Bump {
       return this.peek_timed (-1);
     }
 
-    public override bool offer (G element) {
+    public new bool offer (G element) {
       bool emit_shortage = false;
 
       this.mutex.lock ();
@@ -99,10 +99,13 @@ namespace Bump {
       return r;
     }
 
-    public override void foreach (Gee.ForallFunc<G> f) {
+    public override bool foreach (Gee.ForallFunc<G> f) {
       this.mutex.lock ();
-      base.foreach ((d) => { f (d); });
-      this.mutex.unlock ();
+      try {
+        return base.foreach ((d) => { return f (d); });
+      } finally {
+        this.mutex.unlock ();
+      }
     }
 
     /**
