@@ -35,11 +35,11 @@ namespace Bump {
 
         if ( typeof (G).is_a (typeof (GLib.Initable)) )
           if ( !((GLib.Initable) result).init (cancellable) )
-            throw new GLib.IOError.FAILED ("Unable to initialize a new %s: unknown error.", typeof (G).name);
+            throw new GLib.IOError.FAILED ("Unable to initialize a new %s: unknown error.", typeof (G).name ());
 
         return result;
       } else {
-        throw new GLib.IOError.NOT_SUPPORTED ("Attempted to create a %s instance without implementing a method to do so.", typeof (G).name);
+        throw new GLib.IOError.NOT_SUPPORTED ("Attempted to create a %s instance without implementing a method to do so.", typeof (G).name ());
       }
     }
 
@@ -66,7 +66,7 @@ namespace Bump {
         unowned GLib.AsyncInitable ai = (GLib.AsyncInitable) result;
         bool success = yield ai.init_async (priority, cancellable);
         if ( !success )
-          throw new GLib.IOError.FAILED ("Unable to initialize a new %s: unknown error.", typeof (G).name);
+          throw new GLib.IOError.FAILED ("Unable to initialize a new %s: unknown error.", typeof (G).name ());
 
         return result;
       } else {
