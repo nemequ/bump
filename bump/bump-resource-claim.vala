@@ -52,7 +52,7 @@ namespace Bump {
       return yield base.init_async (io_priority, cancellable);
     }
 
-    ~ SemaphoreClaim () {
+    ~ ResourceClaim () {
       if ( this.time_released == 0 && this.time_acquired != 0 )
         this.release ();
     }
