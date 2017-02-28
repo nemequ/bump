@@ -12,8 +12,8 @@ namespace Bump {
       public GLib.TimeSpan max_idle_time = GLib.TimeSpan.SECOND;
       public int num_threads = 0;
       public int idle_threads = 0;
-      public GLib.HashTable<GLib.Thread<void*>,unowned GLib.Thread<void*>>? threads =
-        new GLib.HashTable<GLib.Thread,GLib.Thread> (GLib.direct_hash, GLib.direct_equal);
+      public GLib.GenericSet<GLib.Thread<void*>>? threads =
+        new GLib.GenericSet<GLib.Thread<void*>> (GLib.direct_hash, GLib.direct_equal);
     }
 
     /**
@@ -226,7 +226,7 @@ namespace Bump {
       for ( int i = 0 ; i < threads_to_spawn ; i++ ) {
         this.ref ();
         GLib.Thread<void*> gthread = new GLib.Thread<void*> (name, this.thread_callback);
-        data.threads.add (gthread);
+        data.threads.add ((owned) gthread);
       }
 
       return threads_to_spawn;
